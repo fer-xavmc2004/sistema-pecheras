@@ -49,7 +49,7 @@
     <script>
         let db;
         // VERIFICA TU IP EN CMD (ipconfig) ANTES DE CONTINUAR
-        const LAPTOP_IP = "http://192.168.3.150:8080/vender"; 
+        const LAPTOP_IP = "http://192.168.3.150:9090/vender"; 
 
         const request = indexedDB.open("GDataStore", 2);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("ventas", { autoIncrement: true }); };
@@ -68,11 +68,24 @@
         }
 
         function enviarDato(item, cant) {
-            const finalUrl = `${LAPTOP_IP}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&v=${Date.now()}`;
-            // El truco de la imagen es el único que Safari no bloquea nunca
-            const tracker = new Image();
-            tracker.src = finalUrl;
-        }
+    // Usamos el metodo del formulario oculto (el mas agresivo para saltar firewalls)
+    const form = document.createElement('form');
+    form.method = 'GET';
+    form.action = LAPTOP_IP;
+    form.target = 'hidden_iframe'; // No recarga la pagina
+    
+    const inputItem = document.createElement('input');
+    inputItem.name = 'item'; inputItem.value = item;
+    form.appendChild(inputItem);
+
+    const inputCant = document.createElement('input');
+    inputCant.name = 'cant'; inputCant.value = cant;
+    form.appendChild(inputCant);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+}
 
         async function sincronizar() {
             pop("🚀 Enviando...");
@@ -124,6 +137,7 @@
     </script>
 </body>
 </html>
+
 
 
 
