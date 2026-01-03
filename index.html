@@ -3,34 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Pecheras G1 - Edge Compatible</title>
+    <title>Pecheras G1 - Control</title>
     <style>
         :root { --p: #1a73e8; --bg: #f8f9fa; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
         body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px; }
         .card { background: var(--card); border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; max-width: 400px; margin: auto; }
         h2 { color: var(--p); font-weight: 800; margin-bottom: 25px; }
-        input { width: 100%; padding: 18px; border-radius: 15px; border: 2px solid var(--p); font-size: 28px; text-align: center; margin-bottom: 25px; background: var(--card); color: var(--t); box-sizing: border-box; outline: none; }
+        input { width: 100%; padding: 18px; border-radius: 15px; border: 2px solid var(--p); font-size: 28px; text-align: center; margin-bottom: 25px; background: var(--card); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
         .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; cursor: pointer; }
         .btn:active { transform: scale(0.95); opacity: 0.8; }
-        
-        #sync { 
-            display: none; 
-            background: #ff9800; 
-            color: white; 
-            padding: 22px; 
-            border-radius: 18px; 
-            text-align: center; 
-            font-weight: 800; 
-            width: 100%; 
-            border: none; 
-            font-size: 18px; 
-            box-shadow: 0 6px 15px rgba(255,152,0,0.4); 
-            margin-top: 10px;
-            cursor: pointer;
-        }
-        
+        #sync { display: none; background: #ff9800; color: white; padding: 22px; border-radius: 18px; text-align: center; font-weight: 800; width: 100%; border: none; font-size: 18px; box-shadow: 0 6px 15px rgba(255,152,0,0.4); margin-top: 10px; cursor: pointer; }
         #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
     </style>
 </head>
@@ -53,8 +37,7 @@
         let bloqueado = false;
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        // Versión V600 para Edge
-        const request = indexedDB.open("DB_PECHERAS_V600", 1);
+        const request = indexedDB.open("DB_PECHERAS_V700", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; act(); };
 
@@ -62,20 +45,14 @@
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
-            tx.oncomplete = () => { 
-                bloqueado = false; // Aseguramos que el sistema esté listo
-                act(); 
-                pop("📦 " + m + " Anotado"); 
-            };
+            tx.oncomplete = () => { act(); pop("📦 Anotado"); };
         }
 
         async function sincronizar() {
             if (bloqueado) return;
             bloqueado = true;
-            
-            const btn = document.getElementById('sync');
-            btn.style.display = 'none'; // Desaparece inmediatamente en Edge
-            pop("🚀 Enviando...");
+            document.getElementById('sync').style.display = 'none';
+            pop("🚀 Enviando a PC...");
 
             const tx = db.transaction("v", "readonly");
             const store = tx.objectStore("v");
@@ -87,26 +64,24 @@
                     ventas.push({m: cur.value.m, c: cur.value.c});
                     cur.continue();
                 } else {
-                    // Envío secuencial para no saturar ngrok en Edge
                     for (const v of ventas) {
                         try {
                             const url = `${URL_PC}?item=${encodeURIComponent(v.m)}&cant=${encodeURIComponent(v.c)}&z=${Date.now()}`;
-                            await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' } });
-                        } catch (err) { console.log("Reintentando..."); }
+                            // Cambiamos a fetch con cabeceras explícitas para Edge
+                            await fetch(url, { 
+                                method: 'GET',
+                                mode: 'cors', 
+                                headers: { 'ngrok-skip-browser-warning': 'true' } 
+                            });
+                        } catch (err) { console.error("Error de conexión en Edge"); }
                     }
                     
-                    // LIMPIEZA TOTAL
                     const cleanTx = db.transaction("v", "readwrite");
-                    const objStore = cleanTx.objectStore("v");
-                    objStore.clear(); 
-                    
+                    cleanTx.objectStore("v").clear();
                     cleanTx.oncomplete = () => {
                         pop("✅ ENVIADO Y LIMPIO");
-                        // Timeout para asegurar que Edge procese el borrado antes de refrescar el botón
-                        setTimeout(() => {
-                            bloqueado = false;
-                            act(); 
-                        }, 300);
+                        bloqueado = false;
+                        act();
                     };
                 }
             };
@@ -114,17 +89,13 @@
 
         function act() {
             if (!db) return;
-            const tx = db.transaction("v", "readonly");
-            tx.objectStore("v").count().onsuccess = (e) => {
-                const count = e.target.result;
+            db.transaction("v", "readonly").objectStore("v").count().onsuccess = (e) => {
                 const btn = document.getElementById('sync');
-                // En Edge, reforzamos que el botón solo aparezca si la cuenta es mayor a 0
+                const count = e.target.result;
                 if (count > 0 && !bloqueado) {
                     btn.style.display = 'block';
                     btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
-                } else {
-                    btn.style.display = 'none';
-                }
+                } else { btn.style.display = 'none'; }
             };
         }
 
@@ -135,6 +106,7 @@
     </script>
 </body>
 </html>
+
 
 
 
