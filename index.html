@@ -12,10 +12,10 @@
         h2 { color: var(--p); font-weight: 800; margin-bottom: 25px; }
         input { width: 100%; padding: 18px; border-radius: 15px; border: 2px solid var(--p); font-size: 28px; text-align: center; margin-bottom: 25px; background: var(--card); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
-        .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; transition: 0.2s; }
+        .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; }
         .btn:active { transform: scale(0.95); opacity: 0.8; }
         
-        /* BOTÓN NARANJA AHORA ABAJO */
+        /* Botón Naranja Abajo */
         #sync { 
             display: none; 
             background: #ff9800; 
@@ -31,32 +31,30 @@
             margin-top: 10px;
         }
         
-        #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
     </style>
 </head>
 <body>
     <div id="msg"></div>
-    
     <div class="card">
         <h2>🛍️ Nueva Venta</h2>
         <input type="number" id="cant" value="1" inputmode="numeric">
-        
         <div class="grid">
             <button class="btn" onclick="vender('Chihuahua')">🐕 Chihuahua</button>
             <button class="btn" onclick="vender('Mediana')">🐩 Mediana</button>
             <button class="btn" onclick="vender('Grande')">🐕‍🦺 Grande</button>
             <button class="btn" onclick="vender('Reforzada')">🛡️ Reforzada</button>
         </div>
-
         <button id="sync" onclick="sincronizar()">🔄 ENVIAR VENTAS A PC</button>
     </div>
 
     <script>
         let db;
+        let enviando = false;
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        // Versión V200 para asegurar que Safari limpie la memoria
-        const request = indexedDB.open("DB_PECHERAS_V200", 1);
+        // Versión V300 para forzar limpieza total
+        const request = indexedDB.open("DB_PECHERAS_V300", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; act(); };
 
@@ -64,14 +62,19 @@
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
-            tx.oncomplete = () => { act(); pop("📦 Anotado"); };
+            tx.oncomplete = () => { 
+                enviando = false; // Reset de estado por si acaso
+                act(); 
+                pop("📦 " + m + " Anotado"); 
+            };
         }
 
         async function sincronizar() {
-            const btn = document.getElementById('sync');
+            if (enviando) return;
+            enviando = true;
             
-            // ELIMINACIÓN TOTAL: Quitamos el botón de la pantalla para que no se pueda pulsar más
-            if(btn) btn.remove(); 
+            const btn = document.getElementById('sync');
+            btn.style.display = 'none'; // Desaparece al instante
             
             pop("🚀 Enviando a PC...");
 
@@ -88,18 +91,16 @@
                     for (const r of registros) {
                         const query = `?item=${encodeURIComponent(r.m)}&cant=${encodeURIComponent(r.c)}&z=${Date.now()}`;
                         try {
-                            const resp = await fetch(URL_PC + query, { 
-                                headers: { 'ngrok-skip-browser-warning': 'true' } 
-                            });
+                            const resp = await fetch(URL_PC + query, { headers: { 'ngrok-skip-browser-warning': 'true' } });
                             if (resp.ok) {
                                 const delTx = db.transaction("v", "readwrite");
                                 delTx.objectStore("v").delete(r.id);
                             }
-                        } catch (err) { console.log("Reintentando..."); }
+                        } catch (err) { console.log("Error"); }
                     }
-                    
-                    pop("✅ ¡TODO ENVIADO!");
-                    setTimeout(() => { location.reload(); }, 1200);
+                    pop("✅ ¡CONSOLA ACTUALIZADA!");
+                    // NO hay reload. Solo dejamos que 'act' oculte el botón si no hay más datos.
+                    act();
                 }
             };
         }
@@ -108,20 +109,25 @@
             if (!db) return;
             db.transaction("v").objectStore("v").count().onsuccess = (e) => {
                 const btn = document.getElementById('sync');
-                if (!btn) return; // Si ya se eliminó, no hacemos nada
                 const count = e.target.result;
-                btn.style.display = count > 0 ? 'block' : 'none';
-                btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
+                // El botón solo aparece si hay datos y NO estamos en medio de un envío
+                if (count > 0 && !enviando) {
+                    btn.style.display = 'block';
+                    btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
+                } else {
+                    btn.style.display = 'none';
+                }
             };
         }
 
         function pop(t) {
             const m = document.getElementById('msg'); m.innerText = t; m.style.display = 'block';
-            setTimeout(() => m.style.display = 'none', 2500);
+            setTimeout(() => m.style.display = 'none', 2000);
         }
     </script>
 </body>
 </html>
+
 
 
 
