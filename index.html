@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <title>Gestor G1</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
     <style>
         :root { --p: #1a73e8; --bg: #ffffff; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
@@ -37,7 +35,7 @@
                 <button class="btn-v" onclick="vender('Reforzada')">🛡️ Reforzada</button>
             </div>
         </div>
-        <div id="sync-box" onclick="sincronizar()">🔄 SINCRONIZAR DATOS</div>
+        <div id="sync-box" onclick="sincronizar()">🔄 ENVIAR DATOS A PC</div>
     </div>
     <div id="p-historial" class="pantalla">
         <h2>📋 Resumen Local</h2>
@@ -64,31 +62,28 @@
             tx.oncomplete = () => { 
                 pop("✅ Guardado en iPhone"); 
                 revisarPendientes(); 
-                enviarHaciaLaptop(m, c);
+                // Intento de envío rápido
+                fetch(`${LAPTOP_IP}?item=${m}&cant=${c}`, { mode: 'no-cors' });
             };
         }
 
-        function enviarHaciaLaptop(item, cant) {
-            // Método infalible: usar una imagen invisible para saltar el CORS
-            const img = new Image();
-            img.src = `${LAPTOP_IP}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&t=${Date.now()}`;
-        }
-
         async function sincronizar() {
-            pop("🔄 Enviando a PC...");
+            pop("🔄 Enviando...");
             const tx = db.transaction("logs", "readwrite");
             const store = tx.objectStore("logs");
-            store.openCursor().onsuccess = (e) => {
+            store.openCursor().onsuccess = async (e) => {
                 const cursor = e.target.result;
                 if(cursor) {
                     const d = cursor.value;
-                    enviarHaciaLaptop(d.item, d.cant);
-                    const delTx = db.transaction("logs", "readwrite");
-                    delTx.objectStore("logs").delete(cursor.primaryKey);
-                    cursor.continue();
+                    try {
+                        await fetch(`${LAPTOP_IP}?item=${d.item}&cant=${d.cant}`, { mode: 'no-cors' });
+                        const delTx = db.transaction("logs", "readwrite");
+                        delTx.objectStore("logs").delete(cursor.primaryKey);
+                        cursor.continue();
+                    } catch(err) { pop("❌ Sin conexión"); }
                 } else { 
-                    pop("✅ Sincronizado"); 
-                    setTimeout(() => location.reload(), 1500); 
+                    pop("✅ Hecho"); 
+                    setTimeout(() => location.reload(), 1000); 
                 }
             };
         }
@@ -121,11 +116,12 @@
 
         function pop(m) {
             const t = document.getElementById('pop'); t.innerText = m; t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
+            setTimeout(() => t.style.display = 'none', 2000);
         }
     </script>
 </body>
 </html>
+
 
 
 
