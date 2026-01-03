@@ -17,13 +17,11 @@
         input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 22px; text-align: center; margin-bottom: 15px; background: var(--bg); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .btn-v { background: var(--p); color: white; border: none; padding: 20px; border-radius: 18px; font-weight: bold; font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .btn-v:active { opacity: 0.7; transform: scale(0.95); }
         .nav { position: fixed; bottom: 0; width: 100%; height: 80px; background: var(--card); display: flex; border-top: 1px solid rgba(128,128,128,0.2); }
         .nav button { flex: 1; border: none; background: none; color: var(--t); font-weight: bold; opacity: 0.4; }
         .nav button.active { opacity: 1; color: var(--p); }
-        #sync-box { display: none; background: #ff9800; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; margin-bottom: 15px; cursor: pointer; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-        #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; text-align: center; min-width: 200px; }
+        #sync-box { display: none; background: #ff9800; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; margin-bottom: 15px; cursor: pointer; }
+        #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; }
     </style>
 </head>
 <body>
@@ -41,13 +39,11 @@
         </div>
         <div id="sync-box" onclick="sincronizar()">🔄 SINCRONIZAR CON PC</div>
     </div>
-
     <div id="p-historial" class="pantalla">
         <h2>📋 Resumen Local</h2>
         <div id="lista-pendientes"></div>
-        <div id="resumen-suma" style="text-align:center; font-weight:bold; padding:20px; color:var(--p);"></div>
+        <div id="resumen-suma" style="text-align:center; font-weight:bold; padding:20px;"></div>
     </div>
-
     <div class="nav">
         <button id="n-v" class="active" onclick="ver('v')">🏠 INICIO</button>
         <button id="n-h" onclick="ver('h')">📊 HISTORIAL</button>
@@ -63,57 +59,56 @@
 
         function vender(m) {
             const c = document.getElementById('cant').value;
-            const log = { item: m, cant: c, f: new Date().getTime() }; // f es un ID único basado en tiempo
+            const log = { item: m, cant: c, id: Date.now() };
             const tx = db.transaction("logs", "readwrite");
             tx.objectStore("logs").add(log);
             tx.oncomplete = () => { 
-                pop("✅ Guardado en Celular"); 
+                pop("✅ Guardado en celular"); 
                 revisarPendientes(); 
-                intentarSincroUnica(log); 
+                enviarDato(log); 
             };
         }
 
-        function intentarSincroUnica(datos) {
-            const p = new URLSearchParams({ item: datos.item, cant: datos.cant });
-            fetch(LAPTOP_IP + "?" + p.toString())
-            .then(res => {
-                if(res.ok) { pop("🚀 Sincronizado con PC"); borrarDeLocal(datos.f); }
+        function enviarDato(d) {
+            const p = new URLSearchParams({ item: d.item, cant: d.cant });
+            // 'no-cors' hace que el iPhone envíe el dato aunque la laptop sea http
+            fetch(LAPTOP_IP + "?" + p.toString(), { mode: 'no-cors' })
+            .then(() => { 
+                pop("🚀 Enviado a Laptop"); 
+                borrarID(d.id); 
             })
-            .catch(() => pop("📡 Modo Offline: Guardado"));
+            .catch(() => pop("📡 Laptop desconectada"));
         }
 
         async function sincronizar() {
             pop("🔄 Sincronizando todo...");
             const tx = db.transaction("logs", "readwrite");
             const store = tx.objectStore("logs");
-            
             store.openCursor().onsuccess = async (e) => {
                 const cursor = e.target.result;
                 if(cursor) {
-                    const datos = cursor.value;
+                    const d = cursor.value;
                     try {
-                        const p = new URLSearchParams({ item: datos.item, cant: datos.cant });
-                        const r = await fetch(LAPTOP_IP + "?" + p.toString());
-                        if(r.ok) {
-                            const delTx = db.transaction("logs", "readwrite");
-                            delTx.objectStore("logs").delete(cursor.primaryKey);
-                            cursor.continue();
-                        }
-                    } catch(err) { pop("❌ Laptop fuera de alcance"); }
+                        const p = new URLSearchParams({ item: d.item, cant: d.cant });
+                        await fetch(LAPTOP_IP + "?" + p.toString(), { mode: 'no-cors' });
+                        const delTx = db.transaction("logs", "readwrite");
+                        delTx.objectStore("logs").delete(cursor.primaryKey);
+                        cursor.continue();
+                    } catch(err) { pop("❌ Error de conexión"); }
                 } else { 
-                    pop("✅ Sincronización Completa"); 
-                    setTimeout(() => location.reload(), 1500); 
+                    pop("✅ Todo sincronizado"); 
+                    setTimeout(() => location.reload(), 1000); 
                 }
             };
         }
 
-        function borrarDeLocal(id) {
+        function borrarID(id) {
             const tx = db.transaction("logs", "readwrite");
             const store = tx.objectStore("logs");
             store.openCursor().onsuccess = (e) => {
                 const c = e.target.result;
                 if(c) {
-                    if(c.value.f === id) c.delete();
+                    if(c.value.id === id) c.delete();
                     else c.continue();
                 }
                 revisarPendientes();
@@ -135,9 +130,9 @@
                 const cursor = e.target.result;
                 if(cursor) {
                     total += parseInt(cursor.value.cant);
-                    lista.innerHTML += `<div class="card"><b>${cursor.value.item}</b>: ${cursor.value.cant} docenas</div>`;
+                    lista.innerHTML += `<div class="card"><b>${cursor.value.item}</b>: ${cursor.value.cant} doc.</div>`;
                     cursor.continue();
-                } else { document.getElementById('resumen-suma').innerText = "Total acumulado: " + total + " docenas"; }
+                } else { document.getElementById('resumen-suma').innerText = "Total: " + total; }
             };
         }
 
@@ -154,6 +149,7 @@
     </script>
 </body>
 </html>
+
 
 
 
