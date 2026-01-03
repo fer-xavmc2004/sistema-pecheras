@@ -13,8 +13,9 @@
         input { width: 100%; padding: 18px; border-radius: 15px; border: 2px solid var(--p); font-size: 28px; text-align: center; margin-bottom: 25px; background: var(--card); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; }
-        .btn:active { opacity: 0.5; transform: scale(0.95); }
-        #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; box-shadow: 0 4px 10px rgba(255,152,0,0.3); }
+        .btn:active { opacity: 0.5; }
+        #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; }
+        #sync:disabled { background: #ccc; opacity: 0.6; }
         #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
     </style>
 </head>
@@ -34,10 +35,10 @@
 
     <script>
         let db;
+        let estaSincronizando = false;
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        // IMPORTANTE: He subido la versión de la base de datos para limpiar errores previos
-        const request = indexedDB.open("DB_PECHERAS_FINAL_V10", 1);
+        const request = indexedDB.open("DB_PECHERAS_FINAL_V20", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; act(); };
 
@@ -45,46 +46,47 @@
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
-            tx.oncomplete = () => { 
-                act(); 
-                pop("📦 Anotado en lista"); 
-            };
+            tx.oncomplete = () => { act(); pop("📦 Anotado"); };
         }
 
         async function sincronizar() {
-            pop("🚀 Enviando a PC...");
+            if (estaSincronizando) return; // Si ya está enviando, no hagas nada
+            
+            estaSincronizando = true;
+            const btnSync = document.getElementById('sync');
+            btnSync.disabled = true; // Bloqueamos el botón físicamente
+            btnSync.innerText = "🚀 ENVIANDO... ESPERE";
+            
+            pop("🚀 Sincronizando...");
+
             const tx = db.transaction("v", "readwrite");
             const store = tx.objectStore("v");
             const registros = [];
 
-            // 1. Recogemos lo que hay en el iPhone
             store.openCursor().onsuccess = async (e) => {
                 const cur = e.target.result;
                 if(cur) {
                     registros.push({ id: cur.primaryKey, m: cur.value.m, c: cur.value.c });
                     cur.continue();
                 } else {
-                    // 2. Cuando ya tenemos la lista, enviamos uno por uno
                     for (const r of registros) {
                         const query = `?item=${encodeURIComponent(r.m)}&cant=${encodeURIComponent(r.c)}&z=${Date.now()}`;
                         try {
                             const resp = await fetch(URL_PC + query, { 
                                 headers: { 'ngrok-skip-browser-warning': 'true' } 
                             });
-                            
                             if (resp.ok) {
-                                // 3. Si la PC respondió OK, lo borramos del iPhone
                                 const delTx = db.transaction("v", "readwrite");
                                 delTx.objectStore("v").delete(r.id);
                             }
-                        } catch (err) { console.log("Fallo envío id: " + r.id); }
+                        } catch (err) { console.log("Reintentando..."); }
                     }
                     
-                    // 4. Finalizamos
+                    pop("✅ ¡TODO EN CONSOLA!");
                     setTimeout(() => { 
-                        pop("✅ Sincronización Exitosa"); 
+                        estaSincronizando = false;
                         location.reload(); 
-                    }, 1500);
+                    }, 1000);
                 }
             };
         }
@@ -93,18 +95,21 @@
             db.transaction("v").objectStore("v").count().onsuccess = (e) => {
                 const btn = document.getElementById('sync');
                 const count = e.target.result;
-                btn.style.display = count > 0 ? 'block' : 'none';
-                if(count > 0) btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
+                if (!estaSincronizando) {
+                    btn.style.display = count > 0 ? 'block' : 'none';
+                    btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
+                }
             };
         }
 
         function pop(t) {
             const m = document.getElementById('msg'); m.innerText = t; m.style.display = 'block';
-            setTimeout(() => m.style.display = 'none', 3000);
+            setTimeout(() => m.style.display = 'none', 2500);
         }
     </script>
 </body>
 </html>
+
 
 
 
