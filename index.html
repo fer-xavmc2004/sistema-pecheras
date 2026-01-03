@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Pecheras G1 - Sistema Fijo</title>
+    <title>Pecheras G1 - Control</title>
     <style>
         :root { --p: #1a73e8; --bg: #f8f9fa; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
@@ -14,13 +14,13 @@
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; }
         .btn:active { opacity: 0.5; transform: scale(0.95); }
-        #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; }
+        #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; box-shadow: 0 4px 10px rgba(255,152,0,0.3); }
         #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
     </style>
 </head>
 <body>
     <div id="msg"></div>
-    <button id="sync" onclick="sincronizar()">🔄 SINCRONIZAR AHORA</button>
+    <button id="sync" onclick="sincronizar()">🔄 ENVIAR VENTAS A PC</button>
     <div class="card">
         <h2>🛍️ Nueva Venta</h2>
         <input type="number" id="cant" value="1" inputmode="numeric">
@@ -34,53 +34,61 @@
 
     <script>
         let db;
-        // TU URL FIJA DEFINITIVA
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        const request = indexedDB.open("DB_PECHERAS_FINAL_PRO", 1);
+        const request = indexedDB.open("DB_PECHERAS_V5", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; act(); };
 
+        // 1. Guardar solo en el iPhone
         function vender(m) {
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
-            tx.oncomplete = () => { act(); pop("✅ Guardado"); enviar(m, c); };
+            tx.oncomplete = () => { 
+                act(); 
+                pop("📦 Anotado en lista"); 
+            };
         }
 
-        async function enviar(item, cant) {
+        // 2. Función de envío (ahora es privada para la sincronización)
+        async function enviarDato(item, cant) {
             const query = `?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&z=${Date.now()}`;
             try {
-                // Esta cabecera salta el aviso de ngrok automáticamente
                 await fetch(URL_PC + query, {
                     method: 'GET',
                     headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
-                console.log("Enviado con éxito");
-            } catch (e) {
-                console.log("Error de red, se queda en sincronización pendiente.");
-            }
+            } catch (e) { console.log("Error de conexión"); }
         }
 
+        // 3. Sincronizar todo de golpe
         async function sincronizar() {
-            pop("🚀 Sincronizando...");
+            pop("🚀 Enviando a PC...");
             const tx = db.transaction("v", "readwrite");
             const store = tx.objectStore("v");
-            store.openCursor().onsuccess = (e) => {
+            
+            store.openCursor().onsuccess = async (e) => {
                 const cur = e.target.result;
                 if(cur) {
-                    enviar(cur.value.m, cur.value.c);
-                    store.delete(cur.primaryKey);
+                    await enviarDato(cur.value.m, cur.value.c); // Envía
+                    store.delete(cur.primaryKey); // Borra del iPhone
                     cur.continue();
                 } else { 
-                    setTimeout(() => { pop("✅ Finalizado"); location.reload(); }, 1500); 
+                    setTimeout(() => { 
+                        pop("✅ Sincronización Exitosa"); 
+                        location.reload(); 
+                    }, 1000); 
                 }
             };
         }
 
         function act() {
             db.transaction("v").objectStore("v").count().onsuccess = (e) => {
-                document.getElementById('sync').style.display = e.target.result > 0 ? 'block' : 'none';
+                const btn = document.getElementById('sync');
+                const count = e.target.result;
+                btn.style.display = count > 0 ? 'block' : 'none';
+                if(count > 0) btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
             };
         }
 
@@ -91,6 +99,7 @@
     </script>
 </body>
 </html>
+
 
 
 
