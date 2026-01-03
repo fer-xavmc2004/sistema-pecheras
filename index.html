@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>PECHERAS PRO</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+    <style>
+        :root {
+            --p: #1a73e8;
+            --bg: #ffffff;
+            --t: #202124;
+            --c: #f1f3f4;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #121212;
+                --t: #e8eaed;
+                --c: #2d2e31;
+            }
+        }
+
+        body {
+            font-family: sans-serif;
+            background: var(--bg);
+            color: var(--t);
+            margin: 0;
+        }
+
+        .pantalla {
+            display: none;
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+
+        .activa {
+            display: block !important;
+        }
+
+        .card {
+            background: var(--c);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid var(--p);
+            font-size: 20px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+            background: var(--bg);
+            color: var(--t);
+        }
+
+        .selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .sel-btn {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid var(--p);
+            background: none;
+            color: var(--t);
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .sel-btn.active {
+            background: var(--p);
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn-v {
+            background: var(--p);
+            color: white;
+            border: none;
+            padding: 20px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+
+        .nav {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            height: 75px;
+            background: var(--c);
+            display: flex;
+            border-top: 1px solid #444;
+        }
+
+        .nav button {
+            flex: 1;
+            border: none;
+            background: none;
+            color: var(--t);
+            font-weight: bold;
+            opacity: 0.4;
+        }
+
+        .nav button.active {
+            opacity: 1;
+            color: var(--p);
+            border-top: 4px solid var(--p);
+        }
+
+        #pop {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: none;
+            z-index: 2000;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="pop"></div>
+
+    <div id="p-ventas" class="pantalla activa">
+        <h2 style="text-align:center">Vender</h2>
+        <div class="card">
+            <input type="number" id="cant" value="1" inputmode="numeric">
+            <div class="selector">
+                <button id="b-doc" class="sel-btn active" onclick="setU('Docena')">DOCENA</button>
+                <button id="b-pie" class="sel-btn" onclick="setU('Pieza')">PIEZA</button>
+            </div>
+            <div class="grid">
+                <button class="btn-v" onclick="vender('Chihuahua')">CHIHUAHUA</button>
+                <button class="btn-v" onclick="vender('Mediana')">MEDIANA</button>
+                <button class="btn-v" onclick="vender('Grande')">GRANDE</button>
+                <button class="btn-v" onclick="vender('Reforzada')">REFORZADA</button>
+            </div>
+        </div>
+        <button id="btn-sync" onclick="sincronizar()"
+            style="display:none; width:100%; background:#f39c12; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold;">🔄
+            SUBIR A LAPTOP</button>
+    </div>
+
+    <div id="p-historial" class="pantalla">
+        <h2 style="text-align:center">Pendientes en Celular</h2>
+        <div id="lista-pendientes" class="card"></div>
+    </div>
+
+    <div class="nav">
+        <button id="n-v" class="active" onclick="ver('v')">VENTAS</button>
+        <button id="n-h" onclick="ver('h')">HISTORIAL</button>
+    </div>
+
+    <script>
+        let unidad = 'Docena';
+        let db;
+
+        // 1. ABRIR BASE DE DATOS (IndexedDB) - Funciona en iPhone y Android
+        const request = indexedDB.open("PecherasDB", 1);
+        request.onupgradeneeded = (e) => {
+            db = e.target.result;
+            db.createObjectStore("ventas", { autoIncrement: true });
+        };
+        request.onsuccess = (e) => { db = e.target.result; mostrarPendientes(); };
+
+        function setU(u) {
+            unidad = u;
+            document.getElementById('b-doc').classList.toggle('active', u === 'Docena');
+            document.getElementById('b-pie').classList.toggle('active', u === 'Pieza');
+        }
+
+        function ver(s) {
+            document.getElementById('p-ventas').classList.toggle('activa', s === 'v');
+            document.getElementById('p-historial').classList.toggle('activa', s === 'h');
+            document.getElementById('n-v').classList.toggle('active', s === 'v');
+            document.getElementById('n-h').classList.toggle('active', s === 'h');
+            if (s === 'h') mostrarPendientes();
+        }
+
+        function vender(m) {
+            const c = document.getElementById('cant').value;
+            const v = { producto: "Pechera " + m, cantidad: c, tipoUnidad: unidad, fecha: new Date().toLocaleString() };
+
+            // GUARDAR EN BASE DE DATOS LOCAL PRIMERO
+            const tx = db.transaction("ventas", "readwrite");
+            tx.objectStore("ventas").add(v);
+            tx.oncomplete = () => {
+                pop("✅ Guardado en celular");
+                document.getElementById('btn-sync').style.display = 'block';
+                // Intentar enviar si hay red
+                fetch('/vender', { method: 'POST', body: new URLSearchParams(v) }).then(r => {
+                    if (r.ok) pop("✅ Sincronizado con Laptop");
+                }).catch(() => { });
+            };
+        }
+
+        function mostrarPendientes() {
+            const lista = document.getElementById('lista-pendientes');
+            lista.innerHTML = "";
+            db.transaction("ventas").objectStore("ventas").openCursor().onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    const d = cursor.value;
+                    lista.innerHTML += `<div style="border-bottom:1px solid #555; padding:10px;">${d.cantidad} ${d.tipoUnidad} - ${d.producto}</div>`;
+                    cursor.continue();
+                }
+            };
+        }
+
+        async function sincronizar() {
+            pop("🔄 Subiendo...");
+            const tx = db.transaction("ventas", "readwrite");
+            const store = tx.objectStore("ventas");
+            store.openCursor().onsuccess = async (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    try {
+                        await fetch('/vender', { method: 'POST', body: new URLSearchParams(cursor.value) });
+                        store.delete(cursor.primaryKey);
+                        cursor.continue();
+                    } catch (err) { pop("❌ Error de red"); }
+                } else {
+                    pop("✅ Todo subido");
+                    location.reload();
+                }
+            };
+        }
+
+        function pop(m) {
+            const t = document.getElementById('pop');
+            t.innerText = m; t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 2000);
+        }
+
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+    </script>
+</body>
+
+</html>
