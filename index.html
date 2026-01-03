@@ -60,29 +60,31 @@
             const tx = db.transaction("logs", "readwrite");
             tx.objectStore("logs").add(log);
             tx.oncomplete = () => { 
-                pop("✅ Guardado en iPhone"); 
+                pop("✅ Guardado"); 
                 revisarPendientes(); 
-                // Intento de envío rápido
-                fetch(`${LAPTOP_IP}?item=${m}&cant=${c}`, { mode: 'no-cors' });
+                enviar(m, c);
             };
         }
 
+        function enviar(item, cant) {
+            // Enviamos el dato a la laptop
+            fetch(`${LAPTOP_IP}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}`, { mode: 'no-cors' });
+        }
+
         async function sincronizar() {
-            pop("🔄 Enviando...");
+            pop("🔄 Sincronizando...");
             const tx = db.transaction("logs", "readwrite");
             const store = tx.objectStore("logs");
-            store.openCursor().onsuccess = async (e) => {
+            store.openCursor().onsuccess = (e) => {
                 const cursor = e.target.result;
                 if(cursor) {
                     const d = cursor.value;
-                    try {
-                        await fetch(`${LAPTOP_IP}?item=${d.item}&cant=${d.cant}`, { mode: 'no-cors' });
-                        const delTx = db.transaction("logs", "readwrite");
-                        delTx.objectStore("logs").delete(cursor.primaryKey);
-                        cursor.continue();
-                    } catch(err) { pop("❌ Sin conexión"); }
+                    enviar(d.item, d.cant);
+                    const delTx = db.transaction("logs", "readwrite");
+                    delTx.objectStore("logs").delete(cursor.primaryKey);
+                    cursor.continue();
                 } else { 
-                    pop("✅ Hecho"); 
+                    pop("✅ Sincronizado"); 
                     setTimeout(() => location.reload(), 1000); 
                 }
             };
@@ -102,7 +104,7 @@
             db.transaction("logs").objectStore("logs").openCursor().onsuccess = (e) => {
                 const c = e.target.result;
                 if(c) {
-                    lista.innerHTML += `<div class="card"><b>${c.value.item}</b>: ${c.value.cant}</div>`;
+                    lista.innerHTML += `<div class="card"><b>${c.value.item}</b>: ${c.value.cant} doc.</div>`;
                     c.continue();
                 }
             };
@@ -121,6 +123,7 @@
     </script>
 </body>
 </html>
+
 
 
 
