@@ -1,191 +1,97 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>PECHERAS PRO</title>
+    <title>Gestor G1</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
     <style>
-        :root {
-            --p: #1a73e8;
-            --bg: #ffffff;
-            --t: #202124;
-            --c: #f1f3f4;
-        }
-
+        :root { --p: #1a73e8; --bg: #ffffff; --t: #202124; --c: #f1f3f4; --card: #ffffff; }
         @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #121212;
-                --t: #e8eaed;
-                --c: #2d2e31;
-            }
+            :root { --bg: #121212; --t: #e8eaed; --c: #2d2e31; --card: #1e1e1e; }
         }
+        
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; transition: 0.3s; }
+        .pantalla { display: none; padding: 20px; padding-bottom: 100px; }
+        .activa { display: block !important; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        body {
-            font-family: sans-serif;
-            background: var(--bg);
-            color: var(--t);
-            margin: 0;
-        }
+        .card { background: var(--card); border-radius: 20px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid rgba(128,128,128,0.1); }
+        
+        h2 { font-weight: 800; color: var(--p); text-align: center; }
 
-        .pantalla {
-            display: none;
-            padding: 20px;
-            padding-bottom: 100px;
-        }
+        input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 22px; text-align: center; margin-bottom: 15px; background: var(--bg); color: var(--t); outline: none; }
+        
+        .selector { display: flex; gap: 10px; margin-bottom: 20px; }
+        .sel-btn { flex: 1; padding: 15px; border: 2px solid var(--p); background: none; color: var(--t); border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .sel-btn.active { background: var(--p); color: white; box-shadow: 0 4px 10px rgba(26, 115, 232, 0.4); }
 
-        .activa {
-            display: block !important;
-        }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn-v { background: var(--p); color: white; border: none; padding: 25px 10px; border-radius: 18px; font-weight: bold; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .btn-v:active { transform: scale(0.92); filter: brightness(1.2); }
 
-        .card {
-            background: var(--c);
-            border-radius: 15px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
+        .nav { position: fixed; bottom: 0; width: 100%; height: 80px; background: var(--card); display: flex; border-top: 1px solid rgba(128,128,128,0.2); backdrop-filter: blur(10px); }
+        .nav button { flex: 1; border: none; background: none; color: var(--t); font-weight: bold; opacity: 0.4; font-size: 12px; }
+        .nav button.active { opacity: 1; color: var(--p); }
+        .nav span { display: block; font-size: 24px; margin-bottom: 4px; }
 
-        input {
-            width: 100%;
-            padding: 15px;
-            border-radius: 10px;
-            border: 2px solid var(--p);
-            font-size: 20px;
-            box-sizing: border-box;
-            margin-bottom: 10px;
-            background: var(--bg);
-            color: var(--t);
-        }
-
-        .selector {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .sel-btn {
-            flex: 1;
-            padding: 15px;
-            border: 2px solid var(--p);
-            background: none;
-            color: var(--t);
-            border-radius: 10px;
-            font-weight: bold;
-        }
-
-        .sel-btn.active {
-            background: var(--p);
-            color: white;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .btn-v {
-            background: var(--p);
-            color: white;
-            border: none;
-            padding: 20px;
-            border-radius: 15px;
-            font-weight: bold;
-        }
-
-        .nav {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            height: 75px;
-            background: var(--c);
-            display: flex;
-            border-top: 1px solid #444;
-        }
-
-        .nav button {
-            flex: 1;
-            border: none;
-            background: none;
-            color: var(--t);
-            font-weight: bold;
-            opacity: 0.4;
-        }
-
-        .nav button.active {
-            opacity: 1;
-            color: var(--p);
-            border-top: 4px solid var(--p);
-        }
-
-        #pop {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #333;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            display: none;
-            z-index: 2000;
-        }
+        #sync-box { display: none; background: #ff9800; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; margin-bottom: 15px; }
+        #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; font-size: 14px; }
+        .total-badge { background: var(--p); color: white; padding: 15px; border-radius: 12px; text-align: center; font-size: 18px; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
-
 <body>
     <div id="pop"></div>
 
     <div id="p-ventas" class="pantalla activa">
-        <h2 style="text-align:center">Vender</h2>
+        <h2>🛍️ Nueva Entrada</h2>
         <div class="card">
+            <label style="font-size: 12px; font-weight: bold; opacity: 0.6;">CANTIDAD</label>
             <input type="number" id="cant" value="1" inputmode="numeric">
+            
             <div class="selector">
-                <button id="b-doc" class="sel-btn active" onclick="setU('Docena')">DOCENA</button>
-                <button id="b-pie" class="sel-btn" onclick="setU('Pieza')">PIEZA</button>
+                <button id="b-doc" class="sel-btn active" onclick="setU('Docena')">📦 DOCENA</button>
+                <button id="b-pie" class="sel-btn" onclick="setU('Pieza')">📍 PIEZA</button>
             </div>
+
             <div class="grid">
-                <button class="btn-v" onclick="vender('Chihuahua')">CHIHUAHUA</button>
-                <button class="btn-v" onclick="vender('Mediana')">MEDIANA</button>
-                <button class="btn-v" onclick="vender('Grande')">GRANDE</button>
-                <button class="btn-v" onclick="vender('Reforzada')">REFORZADA</button>
+                <button class="btn-v" onclick="vender('Chihuahua', '🐕')"><span>🐕</span> CHIHUAHUA</button>
+                <button class="btn-v" onclick="vender('Mediana', '🐩')"><span>🐩</span> MEDIANA</button>
+                <button class="btn-v" onclick="vender('Grande', '🐕‍🦺')"><span>🐕‍🦺</span> GRANDE</button>
+                <button class="btn-v" onclick="vender('Reforzada', '🛡️')"><span>🛡️</span> REFORZADA</button>
             </div>
         </div>
-        <button id="btn-sync" onclick="sincronizar()"
-            style="display:none; width:100%; background:#f39c12; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold;">🔄
-            SUBIR A LAPTOP</button>
+
+        <div id="sync-box" onclick="sincronizar()">🔄 HAY DATOS PENDIENTES - TOCAR PARA SUBIR</div>
     </div>
 
     <div id="p-historial" class="pantalla">
-        <h2 style="text-align:center">Pendientes en Celular</h2>
-        <div id="lista-pendientes" class="card"></div>
+        <h2>📋 Resumen Local</h2>
+        <div id="lista-pendientes"></div>
+        <div id="resumen-suma" class="total-badge">Total acumulado: 0</div>
     </div>
 
     <div class="nav">
-        <button id="n-v" class="active" onclick="ver('v')">VENTAS</button>
-        <button id="n-h" onclick="ver('h')">HISTORIAL</button>
+        <button id="n-v" class="active" onclick="ver('v')"><span>🏠</span>INICIO</button>
+        <button id="n-h" onclick="ver('h')"><span>📊</span>HISTORIAL</button>
     </div>
 
     <script>
         let unidad = 'Docena';
         let db;
+        const LAPTOP_IP = "http://192.168.3.150/vender"; // REEMPLAZA TU_IP_LOCAL
 
-        // 1. ABRIR BASE DE DATOS (IndexedDB) - Funciona en iPhone y Android
-        const request = indexedDB.open("PecherasDB", 1);
-        request.onupgradeneeded = (e) => {
-            db = e.target.result;
-            db.createObjectStore("ventas", { autoIncrement: true });
-        };
-        request.onsuccess = (e) => { db = e.target.result; mostrarPendientes(); };
+        const request = indexedDB.open("GenDataDB", 1);
+        request.onupgradeneeded = (e) => { e.target.result.createObjectStore("logs", { autoIncrement: true }); };
+        request.onsuccess = (e) => { db = e.target.result; revisarPendientes(); };
 
         function setU(u) {
             unidad = u;
             document.getElementById('b-doc').classList.toggle('active', u === 'Docena');
             document.getElementById('b-pie').classList.toggle('active', u === 'Pieza');
+            vibrar(30);
         }
 
         function ver(s) {
@@ -193,66 +99,95 @@
             document.getElementById('p-historial').classList.toggle('activa', s === 'h');
             document.getElementById('n-v').classList.toggle('active', s === 'v');
             document.getElementById('n-h').classList.toggle('active', s === 'h');
-            if (s === 'h') mostrarPendientes();
+            if(s === 'h') mostrarPendientes();
+            vibrar(20);
         }
 
-        function vender(m) {
-            const c = document.getElementById('cant').value;
-            const v = { producto: "Pechera " + m, cantidad: c, tipoUnidad: unidad, fecha: new Date().toLocaleString() };
-
-            // GUARDAR EN BASE DE DATOS LOCAL PRIMERO
-            const tx = db.transaction("ventas", "readwrite");
-            tx.objectStore("ventas").add(v);
+        function vender(m, icono) {
+            const c = parseInt(document.getElementById('cant').value) || 0;
+            const fecha = new Date();
+            const log = { 
+                item: m, 
+                cant: c, 
+                u: unidad, 
+                h: fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                f: fecha.toLocaleDateString()
+            };
+            
+            const tx = db.transaction("logs", "readwrite");
+            tx.objectStore("logs").add(log);
             tx.oncomplete = () => {
-                pop("✅ Guardado en celular");
-                document.getElementById('btn-sync').style.display = 'block';
-                // Intentar enviar si hay red
-                fetch('/vender', { method: 'POST', body: new URLSearchParams(v) }).then(r => {
-                    if (r.ok) pop("✅ Sincronizado con Laptop");
-                }).catch(() => { });
+                pop("✅ Registrado con éxito");
+                vibrar([50, 30, 50]);
+                revisarPendientes();
+                intentarEnvio(log);
             };
         }
 
         function mostrarPendientes() {
             const lista = document.getElementById('lista-pendientes');
+            const resumen = document.getElementById('resumen-suma');
             lista.innerHTML = "";
-            db.transaction("ventas").objectStore("ventas").openCursor().onsuccess = (e) => {
+            let total = 0;
+
+            db.transaction("logs").objectStore("logs").openCursor().onsuccess = (e) => {
                 const cursor = e.target.result;
-                if (cursor) {
+                if(cursor) {
                     const d = cursor.value;
-                    lista.innerHTML += `<div style="border-bottom:1px solid #555; padding:10px;">${d.cantidad} ${d.tipoUnidad} - ${d.producto}</div>`;
+                    total += parseInt(d.cant);
+                    lista.innerHTML += `
+                        <div class="card" style="padding:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <strong>${d.item}</strong><br>
+                                <small style="opacity:0.6">${d.f} - ${d.h}</small>
+                            </div>
+                            <div style="color:var(--p); font-weight:bold;">${d.cant} ${d.u.substring(0,3)}.</div>
+                        </div>`;
                     cursor.continue();
+                } else {
+                    resumen.innerText = `Total Acumulado: ${total}`;
                 }
             };
         }
 
+        function intentarEnvio(datos) {
+            fetch(LAPTOP_IP, { method: 'POST', body: new URLSearchParams(datos) })
+            .then(r => { if(r.ok) pop("🚀 Sincronizado con PC"); });
+        }
+
         async function sincronizar() {
-            pop("🔄 Subiendo...");
-            const tx = db.transaction("ventas", "readwrite");
-            const store = tx.objectStore("ventas");
+            pop("🔄 Conectando con PC...");
+            const tx = db.transaction("logs", "readwrite");
+            const store = tx.objectStore("logs");
             store.openCursor().onsuccess = async (e) => {
                 const cursor = e.target.result;
-                if (cursor) {
+                if(cursor) {
                     try {
-                        await fetch('/vender', { method: 'POST', body: new URLSearchParams(cursor.value) });
-                        store.delete(cursor.primaryKey);
-                        cursor.continue();
-                    } catch (err) { pop("❌ Error de red"); }
+                        const r = await fetch(LAPTOP_IP, { method: 'POST', body: new URLSearchParams(cursor.value) });
+                        if(r.ok) { store.delete(cursor.primaryKey); cursor.continue(); }
+                    } catch(err) { pop("❌ Laptop fuera de alcance"); }
                 } else {
-                    pop("✅ Todo subido");
-                    location.reload();
+                    pop("✅ Sincronización completa");
+                    setTimeout(() => location.reload(), 1000);
                 }
             };
         }
+
+        function revisarPendientes() {
+            db.transaction("logs").objectStore("logs").count().onsuccess = (e) => {
+                document.getElementById('sync-box').style.display = e.target.result > 0 ? 'block' : 'none';
+            };
+        }
+
+        function vibrar(ms) { if(navigator.vibrate) navigator.vibrate(ms); }
 
         function pop(m) {
             const t = document.getElementById('pop');
             t.innerText = m; t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 2000);
+            setTimeout(() => t.style.display = 'none', 2500);
         }
 
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
     </script>
 </body>
-
 </html>
