@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Sistema Pecheras G1</title>
+    <title>Pecheras G1 - Final</title>
     <style>
         :root { --p: #1a73e8; --bg: #f8f9fa; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
@@ -13,14 +13,15 @@
         input { width: 100%; padding: 18px; border-radius: 15px; border: 2px solid var(--p); font-size: 28px; text-align: center; margin-bottom: 25px; background: var(--card); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; }
-        .btn:active { opacity: 0.5; }
-        #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; }
+        .btn:active { background: #1557b0; }
+        #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; animation: pulse 2s infinite; }
         #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="pop"></div>
-    <button id="sync" onclick="sincronizar()">🔄 ENVIAR DATOS A PC</button>
+    <button id="sync" onclick="sincronizar()">🔄 SINCRONIZAR TODO A PC</button>
     <div class="card">
         <h2>🛍️ Nueva Venta</h2>
         <input type="number" id="cant" value="1" inputmode="numeric">
@@ -36,49 +37,37 @@
         let db;
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        // Usamos una base de datos nueva para limpiar errores anteriores
-        const request = indexedDB.open("DB_PECHERAS_FINAL_V1", 1);
+        const request = indexedDB.open("DB_PECHERAS_G1_V_FINAL", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; act(); };
 
-        // ESTA FUNCIÓN SOLO GUARDA EN EL TELÉFONO, NO ENVÍA NADA A LA PC
         function anotar(m) {
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
-            tx.oncomplete = () => { 
-                act(); 
-                msg("📦 Anotado localmente"); 
-            };
+            tx.oncomplete = () => { act(); msg("📦 " + m + " guardado"); };
         }
 
-        // ESTA FUNCIÓN ES LA ÚNICA QUE HABLA CON LA PC
-        async function sincronizar() {
+        function sincronizar() {
             msg("🚀 Sincronizando...");
             const tx = db.transaction("v", "readwrite");
             const store = tx.objectStore("v");
             
-            store.openCursor().onsuccess = async (e) => {
+            store.openCursor().onsuccess = (e) => {
                 const cur = e.target.result;
                 if(cur) {
-                    const item = cur.value.m;
-                    const cant = cur.value.c;
-                    const query = `?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&z=${Date.now()}`;
+                    // Usamos método de Imagen para evitar bloqueos de Safari y enviar todo
+                    const img = new Image();
+                    img.src = `${URL_PC}?item=${encodeURIComponent(cur.value.m)}&cant=${encodeURIComponent(cur.value.c)}&z=${Date.now()}`;
                     
-                    try {
-                        await fetch(URL_PC + query, {
-                            method: 'GET',
-                            headers: { 'ngrok-skip-browser-warning': 'true' }
-                        });
-                        // Solo si el envío fue exitoso, lo borramos del teléfono
-                        const deleteTx = db.transaction("v", "readwrite");
-                        deleteTx.objectStore("v").delete(cur.primaryKey);
-                        cur.continue();
-                    } catch (err) {
-                        msg("❌ Error de conexión");
-                    }
+                    // Borramos inmediatamente de la lista local
+                    store.delete(cur.primaryKey);
+                    cur.continue();
                 } else { 
-                    setTimeout(() => { location.reload(); }, 1000); 
+                    setTimeout(() => { 
+                        msg("✅ ¡TODO ENVIADO!"); 
+                        location.reload(); 
+                    }, 1000); 
                 }
             };
         }
@@ -99,6 +88,7 @@
     </script>
 </body>
 </html>
+
 
 
 
