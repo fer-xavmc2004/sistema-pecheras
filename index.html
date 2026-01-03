@@ -35,7 +35,7 @@
                 <button class="btn-v" onclick="vender('Reforzada')">🛡️ Reforzada</button>
             </div>
         </div>
-        <div id="sync-box" onclick="sincronizar()">🔄 ENVIAR DATOS A PC</div>
+        <div id="sync-box" onclick="sincronizar()">🔄 SINCRONIZAR AHORA</div>
     </div>
     <div id="p-historial" class="pantalla">
         <h2>📋 Resumen Local</h2>
@@ -48,6 +48,7 @@
 
     <script>
         let db;
+        // TU IP DE CONEXIÓN EXITOSA
         const LAPTOP_IP = "http://192.168.3.150:8080/vender"; 
 
         const request = indexedDB.open("GenDataDB", 1);
@@ -62,30 +63,34 @@
             tx.oncomplete = () => { 
                 pop("✅ Guardado"); 
                 revisarPendientes(); 
-                enviar(m, c);
+                dispararEnvio(m, c);
             };
         }
 
-        function enviar(item, cant) {
-            // Enviamos el dato a la laptop
-            fetch(`${LAPTOP_IP}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}`, { mode: 'no-cors' });
+        function dispararEnvio(item, cant) {
+            const url = `${LAPTOP_IP}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&t=${Date.now()}`;
+            // Intento 1: Fetch silencioso
+            fetch(url, { mode: 'no-cors' }).catch(() => {});
+            // Intento 2: Imagen (Pixel tracking)
+            const img = new Image();
+            img.src = url;
         }
 
         async function sincronizar() {
-            pop("🔄 Sincronizando...");
+            pop("🚀 Enviando...");
             const tx = db.transaction("logs", "readwrite");
             const store = tx.objectStore("logs");
             store.openCursor().onsuccess = (e) => {
                 const cursor = e.target.result;
                 if(cursor) {
                     const d = cursor.value;
-                    enviar(d.item, d.cant);
+                    dispararEnvio(d.item, d.cant);
                     const delTx = db.transaction("logs", "readwrite");
                     delTx.objectStore("logs").delete(cursor.primaryKey);
                     cursor.continue();
                 } else { 
-                    pop("✅ Sincronizado"); 
-                    setTimeout(() => location.reload(), 1000); 
+                    pop("✅ Sincronización enviada"); 
+                    setTimeout(() => location.reload(), 1500); 
                 }
             };
         }
@@ -104,7 +109,7 @@
             db.transaction("logs").objectStore("logs").openCursor().onsuccess = (e) => {
                 const c = e.target.result;
                 if(c) {
-                    lista.innerHTML += `<div class="card"><b>${c.value.item}</b>: ${c.value.cant} doc.</div>`;
+                    lista.innerHTML += `<div class="card"><b>${c.value.item}</b>: ${c.value.cant}</div>`;
                     c.continue();
                 }
             };
@@ -118,11 +123,12 @@
 
         function pop(m) {
             const t = document.getElementById('pop'); t.innerText = m; t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 2000);
+            setTimeout(() => t.style.display = 'none', 3000);
         }
     </script>
 </body>
 </html>
+
 
 
 
