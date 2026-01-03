@@ -11,15 +11,15 @@
         .pantalla { display: none; padding: 20px; }
         .activa { display: block !important; }
         .card { background: var(--card); border-radius: 20px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h2 { color: var(--p); text-align: center; }
-        input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 22px; text-align: center; margin-bottom: 15px; background: var(--bg); color: var(--t); box-sizing: border-box; }
+        h2 { color: var(--p); text-align: center; font-weight: 800; }
+        input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 22px; text-align: center; margin-bottom: 15px; background: var(--bg); color: var(--t); box-sizing: border-box; width: 100%; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .btn-v { background: var(--p); color: white; border: none; padding: 20px; border-radius: 18px; font-weight: bold; font-size: 14px; }
         .nav { position: fixed; bottom: 0; width: 100%; height: 80px; background: var(--card); display: flex; border-top: 1px solid rgba(128,128,128,0.2); }
         .nav button { flex: 1; border: none; background: none; color: var(--t); font-weight: bold; opacity: 0.4; }
         .nav button.active { opacity: 1; color: var(--p); }
-        #sync-box { display: none; background: #ff9800; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; margin: 15px; cursor: pointer; }
-        #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; }
+        #sync-box { display: none; background: #ff9800; color: white; padding: 18px; border-radius: 15px; text-align: center; font-weight: bold; margin: 15px; cursor: pointer; }
+        #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; }
     </style>
 </head>
 <body>
@@ -35,7 +35,7 @@
                 <button class="btn-v" onclick="vender('Reforzada')">🛡️ Reforzada</button>
             </div>
         </div>
-        <div id="sync-box" onclick="sincronizar()">🔄 SINCRONIZAR AHORA</div>
+        <div id="sync-box" onclick="sincronizar()">🔄 ENVIAR A PC</div>
     </div>
     <div id="p-historial" class="pantalla">
         <h2>📋 Resumen Local</h2>
@@ -48,49 +48,45 @@
 
     <script>
         let db;
-        // TU IP DE CONEXIÓN EXITOSA
+        // ASEGÚRATE QUE ESTA SIGUE SIENDO TU IP
         const LAPTOP_IP = "http://192.168.3.150:8080/vender"; 
 
-        const request = indexedDB.open("GenDataDB", 1);
-        request.onupgradeneeded = (e) => { e.target.result.createObjectStore("logs", { autoIncrement: true }); };
+        const request = indexedDB.open("GDataStore", 2);
+        request.onupgradeneeded = (e) => { e.target.result.createObjectStore("ventas", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; revisarPendientes(); };
 
         function vender(m) {
             const c = document.getElementById('cant').value;
             const log = { item: m, cant: c };
-            const tx = db.transaction("logs", "readwrite");
-            tx.objectStore("logs").add(log);
+            const tx = db.transaction("ventas", "readwrite");
+            tx.objectStore("ventas").add(log);
             tx.oncomplete = () => { 
-                pop("✅ Guardado"); 
+                pop("✅ Guardado en iPhone"); 
                 revisarPendientes(); 
-                dispararEnvio(m, c);
+                disparar(m, c);
             };
         }
 
-        function dispararEnvio(item, cant) {
-            const url = `${LAPTOP_IP}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&t=${Date.now()}`;
-            // Intento 1: Fetch silencioso
-            fetch(url, { mode: 'no-cors' }).catch(() => {});
-            // Intento 2: Imagen (Pixel tracking)
-            const img = new Image();
-            img.src = url;
+        function disparar(item, cant) {
+            const u = `${LAPTOP_IP}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&z=${Date.now()}`;
+            // Metodo 1: Imagen (mas compatible con iPhone)
+            const i = new Image(); i.src = u;
+            // Metodo 2: Fetch (por si acaso)
+            fetch(u, { mode: 'no-cors' }).catch(() => {});
         }
 
         async function sincronizar() {
-            pop("🚀 Enviando...");
-            const tx = db.transaction("logs", "readwrite");
-            const store = tx.objectStore("logs");
+            pop("🚀 Sincronizando...");
+            const tx = db.transaction("ventas", "readwrite");
+            const store = tx.objectStore("ventas");
             store.openCursor().onsuccess = (e) => {
                 const cursor = e.target.result;
                 if(cursor) {
-                    const d = cursor.value;
-                    dispararEnvio(d.item, d.cant);
-                    const delTx = db.transaction("logs", "readwrite");
-                    delTx.objectStore("logs").delete(cursor.primaryKey);
+                    disparar(cursor.value.item, cursor.value.cant);
+                    store.delete(cursor.primaryKey);
                     cursor.continue();
                 } else { 
-                    pop("✅ Sincronización enviada"); 
-                    setTimeout(() => location.reload(), 1500); 
+                    setTimeout(() => { pop("✅ Finalizado"); location.reload(); }, 1500);
                 }
             };
         }
@@ -106,17 +102,17 @@
         function mostrarPendientes() {
             const lista = document.getElementById('lista-pendientes');
             lista.innerHTML = "";
-            db.transaction("logs").objectStore("logs").openCursor().onsuccess = (e) => {
+            db.transaction("ventas").objectStore("ventas").openCursor().onsuccess = (e) => {
                 const c = e.target.result;
                 if(c) {
-                    lista.innerHTML += `<div class="card"><b>${c.value.item}</b>: ${c.value.cant}</div>`;
+                    lista.innerHTML += `<div class="card"><b>${c.value.item}</b>: ${c.value.cant} doc.</div>`;
                     c.continue();
                 }
             };
         }
 
         function revisarPendientes() {
-            db.transaction("logs").objectStore("logs").count().onsuccess = (e) => {
+            db.transaction("ventas").objectStore("ventas").count().onsuccess = (e) => {
                 document.getElementById('sync-box').style.display = e.target.result > 0 ? 'block' : 'none';
             };
         }
@@ -128,6 +124,7 @@
     </script>
 </body>
 </html>
+
 
 
 
