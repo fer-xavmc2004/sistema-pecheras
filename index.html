@@ -1,31 +1,117 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Gestor G1</title>
+    <title>Gestor G1 - Nube</title>
     <style>
-        :root { --p: #1a73e8; --bg: #ffffff; --t: #202124; --card: #ffffff; }
-        @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding-bottom: 100px; }
-        .pantalla { display: none; padding: 20px; }
-        .activa { display: block !important; }
-        .card { background: var(--card); border-radius: 20px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h2 { color: var(--p); text-align: center; font-weight: 800; }
-        input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 22px; text-align: center; margin-bottom: 15px; background: var(--bg); color: var(--t); box-sizing: border-box; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .btn-v { background: var(--p); color: white; border: none; padding: 20px; border-radius: 18px; font-weight: bold; font-size: 14px; }
-        .nav { position: fixed; bottom: 0; width: 100%; height: 80px; background: var(--card); display: flex; border-top: 1px solid rgba(128,128,128,0.2); }
-        .nav button { flex: 1; border: none; background: none; color: var(--t); font-weight: bold; opacity: 0.4; }
-        .nav button.active { opacity: 1; color: var(--p); }
-        #sync-box { display: none; background: #ff9800; color: white; padding: 18px; border-radius: 15px; text-align: center; font-weight: bold; margin: 15px; cursor: pointer; }
-        #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; }
+        :root {
+            --p: #1a73e8;
+            --bg: #ffffff;
+            --t: #202124;
+            --card: #ffffff;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #121212;
+                --t: #e8eaed;
+                --card: #1e1e1e;
+            }
+        }
+
+        body {
+            font-family: -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--t);
+            margin: 0;
+            padding-bottom: 100px;
+        }
+
+        .pantalla {
+            display: none;
+            padding: 20px;
+        }
+
+        .activa {
+            display: block !important;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: var(--p);
+            text-align: center;
+            font-weight: 800;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid var(--p);
+            font-size: 22px;
+            text-align: center;
+            margin-bottom: 15px;
+            background: var(--bg);
+            color: var(--t);
+            box-sizing: border-box;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn-v {
+            background: var(--p);
+            color: white;
+            border: none;
+            padding: 20px;
+            border-radius: 18px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        #sync-box {
+            display: none;
+            background: #ff9800;
+            color: white;
+            padding: 18px;
+            border-radius: 15px;
+            text-align: center;
+            font-weight: bold;
+            margin: 15px;
+            cursor: pointer;
+        }
+
+        #pop {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px 25px;
+            border-radius: 30px;
+            display: none;
+            z-index: 9999;
+        }
     </style>
 </head>
+
 <body>
     <div id="pop"></div>
     <div id="p-ventas" class="pantalla activa">
-        <h2>🛍️ Nueva Entrada</h2>
+        <h2>🛍️ Venta (Nube ngrok)</h2>
         <div class="card">
             <input type="number" id="cant" value="1" inputmode="numeric">
             <div class="grid">
@@ -37,21 +123,12 @@
         </div>
         <div id="sync-box" onclick="sincronizar()">🔄 ENVIAR A PC</div>
     </div>
-    <div id="p-historial" class="pantalla">
-        <h2>📋 Resumen Local</h2>
-        <div id="lista-pendientes"></div>
-    </div>
-    <div class="nav">
-        <button id="n-v" class="active" onclick="ver('v')">🏠 Inicio</button>
-        <button id="n-h" onclick="ver('h')">📊 Historial</button>
-    </div>
-
     <script>
         let db;
-        // VERIFICA TU IP EN CMD (ipconfig) ANTES DE CONTINUAR
-        const LAPTOP_IP = "http://192.168.3.150:9090/vender"; 
+        // REEMPLAZA ESTA URL CON LA QUE TE DIO NGROK (debe terminar en /vender)
+        const URL_CLOUD = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender";
 
-        const request = indexedDB.open("GDataStore", 2);
+        const request = indexedDB.open("GDataStore", 3);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("ventas", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; revisarPendientes(); };
 
@@ -60,67 +137,27 @@
             const log = { item: m, cant: c };
             const tx = db.transaction("ventas", "readwrite");
             tx.objectStore("ventas").add(log);
-            tx.oncomplete = () => { 
-                pop("✅ Guardado en iPhone"); 
-                revisarPendientes(); 
-                enviarDato(m, c);
-            };
+            tx.oncomplete = () => { pop("✅ Guardado"); revisarPendientes(); enviar(m, c); };
         }
 
-        function enviarDato(item, cant) {
-    // Usamos el metodo del formulario oculto (el mas agresivo para saltar firewalls)
-    const form = document.createElement('form');
-    form.method = 'GET';
-    form.action = LAPTOP_IP;
-    form.target = 'hidden_iframe'; // No recarga la pagina
-    
-    const inputItem = document.createElement('input');
-    inputItem.name = 'item'; inputItem.value = item;
-    form.appendChild(inputItem);
-
-    const inputCant = document.createElement('input');
-    inputCant.name = 'cant'; inputCant.value = cant;
-    form.appendChild(inputCant);
-
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-}
+        function enviar(item, cant) {
+            const final = `${URL_CLOUD}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&v=${Date.now()}`;
+            const img = new Image();
+            img.src = final;
+        }
 
         async function sincronizar() {
-            pop("🚀 Enviando...");
+            pop("🚀 Sincronizando...");
             const tx = db.transaction("ventas", "readwrite");
             const store = tx.objectStore("ventas");
             store.openCursor().onsuccess = (e) => {
                 const cursor = e.target.result;
-                if(cursor) {
-                    enviarDato(cursor.value.item, cursor.value.cant);
+                if (cursor) {
+                    enviar(cursor.value.item, cursor.value.cant);
                     const delTx = db.transaction("ventas", "readwrite");
                     delTx.objectStore("ventas").delete(cursor.primaryKey);
                     cursor.continue();
-                } else { 
-                    setTimeout(() => { pop("✅ Finalizado"); location.reload(); }, 1000);
-                }
-            };
-        }
-
-        function ver(s) {
-            document.getElementById('p-ventas').classList.toggle('activa', s === 'v');
-            document.getElementById('p-historial').classList.toggle('activa', s === 'h');
-            document.getElementById('n-v').classList.toggle('active', s === 'v');
-            document.getElementById('n-h').classList.toggle('active', s === 'h');
-            if(s === 'h') mostrarPendientes();
-        }
-
-        function mostrarPendientes() {
-            const lista = document.getElementById('lista-pendientes');
-            lista.innerHTML = "";
-            db.transaction("ventas").objectStore("ventas").openCursor().onsuccess = (e) => {
-                const c = e.target.result;
-                if(c) {
-                    lista.innerHTML += `<div class="card"><b>${c.value.item}</b>: ${c.value.cant} doc.</div>`;
-                    c.continue();
-                }
+                } else { setTimeout(() => location.reload(), 1500); }
             };
         }
 
@@ -136,7 +173,9 @@
         }
     </script>
 </body>
+
 </html>
+
 
 
 
