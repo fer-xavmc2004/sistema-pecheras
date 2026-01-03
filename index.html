@@ -14,23 +14,7 @@
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
         .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; }
         .btn:active { transform: scale(0.95); opacity: 0.8; }
-        
-        /* Botón Naranja Abajo */
-        #sync { 
-            display: none; 
-            background: #ff9800; 
-            color: white; 
-            padding: 22px; 
-            border-radius: 18px; 
-            text-align: center; 
-            font-weight: 800; 
-            width: 100%; 
-            border: none; 
-            font-size: 18px; 
-            box-shadow: 0 6px 15px rgba(255,152,0,0.4);
-            margin-top: 10px;
-        }
-        
+        #sync { display: none; background: #ff9800; color: white; padding: 22px; border-radius: 18px; text-align: center; font-weight: 800; width: 100%; border: none; font-size: 18px; box-shadow: 0 6px 15px rgba(255,152,0,0.4); margin-top: 10px; }
         #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
     </style>
 </head>
@@ -40,78 +24,80 @@
         <h2>🛍️ Nueva Venta</h2>
         <input type="number" id="cant" value="1" inputmode="numeric">
         <div class="grid">
-            <button class="btn" onclick="vender('Chihuahua')">🐕 Chihuahua</button>
-            <button class="btn" onclick="vender('Mediana')">🐩 Mediana</button>
-            <button class="btn" onclick="vender('Grande')">🐕‍🦺 Grande</button>
-            <button class="btn" onclick="vender('Reforzada')">🛡️ Reforzada</button>
+            <button class="btn" onclick="vender('Chihuahua')">Chihuahua</button>
+            <button class="btn" onclick="vender('Mediana')">Mediana</button>
+            <button class="btn" onclick="vender('Grande')">Grande</button>
+            <button class="btn" onclick="vender('Reforzada')">Reforzada</button>
         </div>
         <button id="sync" onclick="sincronizar()">🔄 ENVIAR VENTAS A PC</button>
     </div>
 
     <script>
         let db;
-        let enviando = false;
+        let estaEnviando = false;
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        // Versión V300 para forzar limpieza total
-        const request = indexedDB.open("DB_PECHERAS_V300", 1);
+        // Versión V400 para asegurar limpieza total de basura anterior
+        const request = indexedDB.open("DB_PECHERAS_V400", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
-        request.onsuccess = (e) => { db = e.target.result; act(); };
+        request.onsuccess = (e) => { db = e.target.result; actualizarBoton(); };
 
         function vender(m) {
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
             tx.oncomplete = () => { 
-                enviando = false; // Reset de estado por si acaso
-                act(); 
-                pop("📦 " + m + " Anotado"); 
+                estaEnviando = false;
+                actualizarBoton(); 
+                mostrarPop("📦 Anotado"); 
             };
         }
 
         async function sincronizar() {
-            if (enviando) return;
-            enviando = true;
+            if (estaEnviando) return;
+            estaEnviando = true;
             
-            const btn = document.getElementById('sync');
-            btn.style.display = 'none'; // Desaparece al instante
-            
-            pop("🚀 Enviando a PC...");
+            document.getElementById('sync').style.display = 'none';
+            mostrarPop("🚀 Sincronizando...");
 
-            const tx = db.transaction("v", "readwrite");
+            const tx = db.transaction("v", "readonly");
             const store = tx.objectStore("v");
-            const registros = [];
+            const ventasParaEnviar = [];
 
             store.openCursor().onsuccess = async (e) => {
-                const cur = e.target.result;
-                if(cur) {
-                    registros.push({ id: cur.primaryKey, m: cur.value.m, c: cur.value.c });
-                    cur.continue();
+                const cursor = e.target.result;
+                if (cursor) {
+                    ventasParaEnviar.push({ id: cursor.primaryKey, m: cursor.value.m, c: cursor.value.c });
+                    cursor.continue();
                 } else {
-                    for (const r of registros) {
-                        const query = `?item=${encodeURIComponent(r.m)}&cant=${encodeURIComponent(r.c)}&z=${Date.now()}`;
+                    // Una vez capturados todos, enviamos y borramos uno por uno
+                    for (const v of ventasParaEnviar) {
                         try {
-                            const resp = await fetch(URL_PC + query, { headers: { 'ngrok-skip-browser-warning': 'true' } });
-                            if (resp.ok) {
+                            const url = `${URL_PC}?item=${encodeURIComponent(v.m)}&cant=${encodeURIComponent(v.c)}&z=${Date.now()}`;
+                            const res = await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+                            
+                            if (res.ok) {
+                                // BORRADO REAL: Solo si la PC respondió OK, lo sacamos de la memoria
                                 const delTx = db.transaction("v", "readwrite");
-                                delTx.objectStore("v").delete(r.id);
+                                await delTx.objectStore("v").delete(v.id);
                             }
-                        } catch (err) { console.log("Error"); }
+                        } catch (err) { console.error("Error en " + v.m); }
                     }
-                    pop("✅ ¡CONSOLA ACTUALIZADA!");
-                    // NO hay reload. Solo dejamos que 'act' oculte el botón si no hay más datos.
-                    act();
+                    
+                    mostrarPop("✅ CONSOLA LIMPIA");
+                    estaEnviando = false;
+                    actualizarBoton(); // Esto esconderá el botón porque ya no habrá registros
                 }
             };
         }
 
-        function act() {
+        function actualizarBoton() {
             if (!db) return;
-            db.transaction("v").objectStore("v").count().onsuccess = (e) => {
-                const btn = document.getElementById('sync');
+            const tx = db.transaction("v", "readonly");
+            tx.objectStore("v").count().onsuccess = (e) => {
                 const count = e.target.result;
-                // El botón solo aparece si hay datos y NO estamos en medio de un envío
-                if (count > 0 && !enviando) {
+                const btn = document.getElementById('sync');
+                if (count > 0 && !estaEnviando) {
                     btn.style.display = 'block';
                     btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
                 } else {
@@ -120,13 +106,14 @@
             };
         }
 
-        function pop(t) {
+        function mostrarPop(t) {
             const m = document.getElementById('msg'); m.innerText = t; m.style.display = 'block';
             setTimeout(() => m.style.display = 'none', 2000);
         }
     </script>
 </body>
 </html>
+
 
 
 
