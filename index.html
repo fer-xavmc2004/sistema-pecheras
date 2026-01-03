@@ -3,89 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>G1 Pecheras</title>
+    <title>Pecheras G1 - Nube</title>
     <style>
-        :root { --p: #1a73e8; --bg: #ffffff; --t: #202124; --card: #ffffff; }
+        :root { --p: #1a73e8; --bg: #f8f9fa; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px 20px 100px 20px; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px; }
         .card { background: var(--card); border-radius: 20px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
-        h2 { color: var(--p); margin-top: 0; font-weight: 800; }
-        input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 26px; text-align: center; margin-bottom: 15px; background: var(--bg); color: var(--t); box-sizing: border-box; }
+        h2 { color: var(--p); font-weight: 800; margin-top: 0; }
+        input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 24px; text-align: center; margin-bottom: 15px; background: var(--card); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .btn-v { background: var(--p); color: white; border: none; padding: 20px; border-radius: 18px; font-weight: bold; font-size: 15px; }
-        #sync-box { display: none; background: #ff9800; color: white; padding: 18px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; cursor: pointer; border: none; width: 100%; }
-        #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; }
+        .btn { background: var(--p); color: white; border: none; padding: 20px; border-radius: 18px; font-weight: bold; font-size: 15px; cursor: pointer; }
+        .btn:active { opacity: 0.7; transform: scale(0.98); }
+        #sync-btn { display: none; background: #ff9800; color: white; padding: 18px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 16px; }
+        #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; text-align: center; }
     </style>
 </head>
 <body>
     <div id="pop"></div>
-    <h2>🛍️ Venta Pecheras</h2>
-    <button id="sync-box" onclick="sincronizar()">🔄 ENVIAR DATOS PENDIENTES</button>
+    <h2>🛍️ Nueva Venta</h2>
+    <button id="sync-btn" onclick="sincronizar()">🔄 ENVIAR DATOS A PC</button>
     <div class="card">
         <input type="number" id="cant" value="1" inputmode="numeric">
         <div class="grid">
-            <button class="btn-v" onclick="vender('Chihuahua')">🐕 Chihuahua</button>
-            <button class="btn-v" onclick="vender('Mediana')">🐩 Mediana</button>
-            <button class="btn-v" onclick="vender('Grande')">🐕‍🦺 Grande</button>
-            <button class="btn-v" onclick="vender('Reforzada')">🛡️ Reforzada</button>
+            <button class="btn" onclick="vender('Chihuahua')">🐕 Chihuahua</button>
+            <button class="btn" onclick="vender('Mediana')">🐩 Mediana</button>
+            <button class="btn" onclick="vender('Grande')">🐕‍🦺 Grande</button>
+            <button class="btn" onclick="vender('Reforzada')">🛡️ Reforzada</button>
         </div>
     </div>
 
     <script>
         let db;
-        // URL DE TU NGROK
-        const URL_API = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
+        const NGROK_URL = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        const request = indexedDB.open("G1_FINAL_V5", 1);
+        const request = indexedDB.open("G1_Final_DB", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
-        request.onsuccess = (e) => { db = e.target.result; act(); };
+        request.onsuccess = (e) => { db = e.target.result; actualizarInterfaz(); };
 
         function vender(m) {
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
-            tx.oncomplete = () => { msg("✅ Guardado"); act(); env(m, c); };
+            tx.oncomplete = () => { 
+                mostrarPop("✅ Guardado"); 
+                actualizarInterfaz(); 
+                enviar(m, c); 
+            };
         }
 
-        function env(item, cant) {
-            // Beacon es el metodo mas confiable para iOS
-            const finalUrl = `${URL_API}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}`;
-            navigator.sendBeacon(finalUrl);
-            
-            // Backup por si acaso
-            const img = new Image();
-            img.src = finalUrl + "&t=" + Date.now();
+        function enviar(item, cant) {
+            const url = `${NGROK_URL}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&t=${Date.now()}`;
+            // Fetch modo 'no-cors' es ideal para enviar datos sin esperar respuesta compleja
+            fetch(url, { mode: 'no-cors' }).catch(err => console.log("Envio fondo"));
         }
 
         async function sincronizar() {
-            msg("🚀 Sincronizando...");
+            mostrarPop("🚀 Enviando...");
             const tx = db.transaction("v", "readwrite");
             const store = tx.objectStore("v");
+            
             store.openCursor().onsuccess = (e) => {
-                const cur = e.target.result;
-                if(cur) {
-                    env(cur.value.m, cur.value.c);
-                    store.delete(cur.primaryKey);
-                    cur.continue();
+                const cursor = e.target.result;
+                if(cursor) {
+                    enviar(cursor.value.m, cursor.value.c);
+                    store.delete(cursor.primaryKey);
+                    cursor.continue();
                 } else { 
-                    setTimeout(() => { msg("✅ Listo"); location.reload(); }, 1000); 
+                    setTimeout(() => { 
+                        mostrarPop("✅ Sincronizado"); 
+                        location.reload(); 
+                    }, 1000); 
                 }
             };
         }
 
-        function act() {
+        function actualizarInterfaz() {
             db.transaction("v").objectStore("v").count().onsuccess = (e) => {
-                document.getElementById('sync-box').style.display = e.target.result > 0 ? 'block' : 'none';
+                document.getElementById('sync-btn').style.display = e.target.result > 0 ? 'block' : 'none';
             };
         }
 
-        function msg(m) {
-            const t = document.getElementById('pop'); t.innerText = m; t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
+        function mostrarPop(m) {
+            const p = document.getElementById('pop'); p.innerText = m; p.style.display = 'block';
+            setTimeout(() => p.style.display = 'none', 3000);
         }
     </script>
 </body>
 </html>
+
 
 
 
