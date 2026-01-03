@@ -8,37 +8,55 @@
         :root { --p: #1a73e8; --bg: #f8f9fa; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px; }
-        .card { background: var(--card); border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+        .card { background: var(--card); border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; max-width: 400px; margin: auto; }
         h2 { color: var(--p); font-weight: 800; margin-bottom: 25px; }
         input { width: 100%; padding: 18px; border-radius: 15px; border: 2px solid var(--p); font-size: 28px; text-align: center; margin-bottom: 25px; background: var(--card); color: var(--t); box-sizing: border-box; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; }
-        .btn:active { opacity: 0.5; transform: scale(0.95); }
-        #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; box-shadow: 0 4px 10px rgba(255,152,0,0.3); }
-        #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+        .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; transition: 0.2s; }
+        .btn:active { transform: scale(0.95); opacity: 0.8; }
+        
+        /* BOTÓN NARANJA AHORA ABAJO */
+        #sync { 
+            display: none; 
+            background: #ff9800; 
+            color: white; 
+            padding: 22px; 
+            border-radius: 18px; 
+            text-align: center; 
+            font-weight: 800; 
+            width: 100%; 
+            border: none; 
+            font-size: 18px; 
+            box-shadow: 0 6px 15px rgba(255,152,0,0.4);
+            margin-top: 10px;
+        }
+        
+        #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
     <div id="msg"></div>
-    <button id="sync" onclick="sincronizar()">🔄 ENVIAR VENTAS A PC</button>
+    
     <div class="card">
         <h2>🛍️ Nueva Venta</h2>
         <input type="number" id="cant" value="1" inputmode="numeric">
+        
         <div class="grid">
             <button class="btn" onclick="vender('Chihuahua')">🐕 Chihuahua</button>
             <button class="btn" onclick="vender('Mediana')">🐩 Mediana</button>
             <button class="btn" onclick="vender('Grande')">🐕‍🦺 Grande</button>
             <button class="btn" onclick="vender('Reforzada')">🛡️ Reforzada</button>
         </div>
+
+        <button id="sync" onclick="sincronizar()">🔄 ENVIAR VENTAS A PC</button>
     </div>
 
     <script>
         let db;
-        let bloqueado = false; // Nueva variable de seguridad
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        // IMPORTANTE: Cambiamos el nombre de la DB para forzar limpieza en Safari
-        const request = indexedDB.open("DB_PECHERAS_FINAL_V100", 1);
+        // Versión V200 para asegurar que Safari limpie la memoria
+        const request = indexedDB.open("DB_PECHERAS_V200", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; act(); };
 
@@ -50,15 +68,12 @@
         }
 
         async function sincronizar() {
-            if (bloqueado) return; // Si ya se pulsó, ignorar clics extras
+            const btn = document.getElementById('sync');
             
-            const btnSync = document.getElementById('sync');
+            // ELIMINACIÓN TOTAL: Quitamos el botón de la pantalla para que no se pueda pulsar más
+            if(btn) btn.remove(); 
             
-            // ACCIÓN RADICAL: Borramos el botón naranja inmediatamente
-            btnSync.style.display = 'none'; 
-            bloqueado = true; // Bloqueo por código
-            
-            pop("🚀 Enviando datos...");
+            pop("🚀 Enviando a PC...");
 
             const tx = db.transaction("v", "readwrite");
             const store = tx.objectStore("v");
@@ -70,7 +85,6 @@
                     registros.push({ id: cur.primaryKey, m: cur.value.m, c: cur.value.c });
                     cur.continue();
                 } else {
-                    // Enviamos la lista capturada
                     for (const r of registros) {
                         const query = `?item=${encodeURIComponent(r.m)}&cant=${encodeURIComponent(r.c)}&z=${Date.now()}`;
                         try {
@@ -81,26 +95,23 @@
                                 const delTx = db.transaction("v", "readwrite");
                                 delTx.objectStore("v").delete(r.id);
                             }
-                        } catch (err) { console.log("Fallo"); }
+                        } catch (err) { console.log("Reintentando..."); }
                     }
                     
-                    pop("✅ ¡TODO EN CONSOLA!");
-                    setTimeout(() => { 
-                        location.reload(); // Recarga para volver a empezar limpio
-                    }, 1000);
+                    pop("✅ ¡TODO ENVIADO!");
+                    setTimeout(() => { location.reload(); }, 1200);
                 }
             };
         }
 
         function act() {
+            if (!db) return;
             db.transaction("v").objectStore("v").count().onsuccess = (e) => {
                 const btn = document.getElementById('sync');
+                if (!btn) return; // Si ya se eliminó, no hacemos nada
                 const count = e.target.result;
-                // Solo mostramos el botón si hay algo y NO estamos sincronizando
-                if (count > 0 && !bloqueado) {
-                    btn.style.display = 'block';
-                    btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
-                }
+                btn.style.display = count > 0 ? 'block' : 'none';
+                btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
             };
         }
 
@@ -111,6 +122,7 @@
     </script>
 </body>
 </html>
+
 
 
 
