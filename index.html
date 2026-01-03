@@ -20,7 +20,7 @@
         .nav { position: fixed; bottom: 0; width: 100%; height: 80px; background: var(--card); display: flex; border-top: 1px solid rgba(128,128,128,0.2); }
         .nav button { flex: 1; border: none; background: none; color: var(--t); font-weight: bold; opacity: 0.4; }
         .nav button.active { opacity: 1; color: var(--p); }
-        #sync-box { display: none; background: #ff9800; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; margin-bottom: 15px; }
+        #sync-box { display: none; background: #ff9800; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; margin-bottom: 15px; cursor: pointer; }
         #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; }
     </style>
 </head>
@@ -51,7 +51,6 @@
 
     <script>
         let db;
-        // USAMOS TU IP DE LA FOTO
         const LAPTOP_IP = "http://192.168.3.150:8080/vender"; 
 
         const request = indexedDB.open("GenDataDB", 1);
@@ -64,19 +63,19 @@
             const tx = db.transaction("logs", "readwrite");
             tx.objectStore("logs").add(log);
             tx.oncomplete = () => { 
-                pop("✅ Guardado en celular"); 
-                if(navigator.vibrate) navigator.vibrate(50);
+                pop("✅ Guardado local"); 
                 revisarPendientes(); 
                 intentarEnvio(log); 
             };
         }
 
         function intentarEnvio(datos) {
-            // Enviamos como URLSearchParams para que Java lo entienda fácil
-            const params = new URLSearchParams(datos);
-            fetch(LAPTOP_IP + "?" + params.toString(), { method: 'GET', mode: 'no-cors' })
-            .then(() => pop("🚀 Enviado a PC"))
-            .catch(() => pop("📡 Guardado (PC offline)"));
+            const p = new URLSearchParams(datos);
+            fetch(LAPTOP_IP + "?" + p.toString()) // Quitamos el no-cors
+            .then(res => {
+                if(res.ok) { pop("🚀 Sincronizado"); borrarRegistro(datos); }
+            })
+            .catch(() => pop("📡 Guardado (Offline)"));
         }
 
         async function sincronizar() {
@@ -87,12 +86,25 @@
                 const cursor = e.target.result;
                 if(cursor) {
                     try {
-                        const params = new URLSearchParams(cursor.value);
-                        await fetch(LAPTOP_IP + "?" + params.toString(), { method: 'GET', mode: 'no-cors' });
-                        store.delete(cursor.primaryKey);
-                        cursor.continue();
-                    } catch(err) { pop("❌ Error: Laptop no alcanzada"); }
+                        const p = new URLSearchParams(cursor.value);
+                        const r = await fetch(LAPTOP_IP + "?" + p.toString());
+                        if(r.ok) { store.delete(cursor.primaryKey); cursor.continue(); }
+                        else { throw new Error(); }
+                    } catch(err) { pop("❌ Laptop fuera de alcance"); }
                 } else { pop("✅ Todo al día"); setTimeout(() => location.reload(), 1000); }
+            };
+        }
+
+        function borrarRegistro(d) {
+            const tx = db.transaction("logs", "readwrite");
+            const store = tx.objectStore("logs");
+            store.openCursor().onsuccess = (e) => {
+                const c = e.target.result;
+                if(c) {
+                    if(c.value.f === d.f) c.delete();
+                    else c.continue();
+                }
+                revisarPendientes();
             };
         }
 
@@ -113,7 +125,7 @@
                     total += parseInt(cursor.value.cant);
                     lista.innerHTML += `<div class="card"><b>${cursor.value.item}</b>: ${cursor.value.cant} doc.</div>`;
                     cursor.continue();
-                } else { document.getElementById('resumen-suma').innerText = "Total: " + total + " docenas"; }
+                } else { document.getElementById('resumen-suma').innerText = "Total pendiente: " + total; }
             };
         }
 
@@ -130,5 +142,6 @@
     </script>
 </body>
 </html>
+
 
 
