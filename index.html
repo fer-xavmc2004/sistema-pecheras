@@ -3,26 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Gestor G1 - Nube</title>
+    <title>Gestor G1 Final</title>
     <style>
         :root { --p: #1a73e8; --bg: #ffffff; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding-bottom: 100px; }
-        .pantalla { display: none; padding: 20px; }
-        .activa { display: block !important; }
-        .card { background: var(--card); border-radius: 20px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h2 { color: var(--p); text-align: center; font-weight: 800; }
-        input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 22px; text-align: center; margin-bottom: 15px; background: var(--bg); color: var(--t); box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px 20px 100px 20px; }
+        .card { background: var(--card); border-radius: 20px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
+        h2 { color: var(--p); margin-top: 0; }
+        input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 24px; text-align: center; margin-bottom: 15px; background: var(--bg); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .btn-v { background: var(--p); color: white; border: none; padding: 20px; border-radius: 18px; font-weight: bold; font-size: 14px; }
-        #sync-box { display: none; background: #ff9800; color: white; padding: 18px; border-radius: 15px; text-align: center; font-weight: bold; margin: 15px; cursor: pointer; }
+        #sync-box { display: none; background: #ff9800; color: white; padding: 18px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; cursor: pointer; }
         #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; }
     </style>
 </head>
 <body>
     <div id="pop"></div>
-    <div id="p-ventas" class="pantalla activa">
-        <h2>🛍️ Venta (NGROK ACTIVO)</h2>
+    <div id="p-ventas">
+        <h2>🛍️ Venta Pecheras</h2>
+        <div id="sync-box" onclick="sincronizar()">🔄 ENVIAR DATOS A PC</div>
         <div class="card">
             <input type="number" id="cant" value="1" inputmode="numeric">
             <div class="grid">
@@ -32,66 +31,57 @@
                 <button class="btn-v" onclick="vender('Reforzada')">🛡️ Reforzada</button>
             </div>
         </div>
-        <div id="sync-box" onclick="sincronizar()">🔄 ENVIAR DATOS A PC</div>
     </div>
+
     <script>
         let db;
-        // TU URL DE NGROK ACTUALIZADA
-        const URL_CLOUD = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
+        // TU URL DE NGROK
+        const URL_NGROK = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        const request = indexedDB.open("GData_Final", 1);
-        request.onupgradeneeded = (e) => { e.target.result.createObjectStore("ventas", { autoIncrement: true }); };
-        request.onsuccess = (e) => { db = e.target.result; revisarPendientes(); };
+        const request = indexedDB.open("G1_Final_DB", 1);
+        request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
+        request.onsuccess = (e) => { db = e.target.result; act(); };
 
         function vender(m) {
             const c = document.getElementById('cant').value;
-            const log = { item: m, cant: c };
-            const tx = db.transaction("ventas", "readwrite");
-            tx.objectStore("ventas").add(log);
-            tx.oncomplete = () => { 
-                pop("✅ Guardado en iPhone"); 
-                revisarPendientes(); 
-                enviarHaciaPC(m, c);
-            };
+            const tx = db.transaction("v", "readwrite");
+            tx.objectStore("v").add({ m, c });
+            tx.oncomplete = () => { msg("✅ Guardado"); act(); env(m, c); };
         }
 
-        function enviarHaciaPC(item, cant) {
-            const finalUrl = `${URL_CLOUD}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&nocache=${Date.now()}`;
-            // Usamos un objeto Image para saltar todas las restricciones
-            const bulto = new Image();
-            bulto.src = finalUrl;
+        function env(item, cant) {
+            const img = new Image();
+            img.src = `${URL_NGROK}?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&t=${Date.now()}`;
         }
 
         async function sincronizar() {
-            pop("🚀 Sincronizando con PC...");
-            const tx = db.transaction("ventas", "readwrite");
-            const store = tx.objectStore("ventas");
+            msg("🚀 Sincronizando...");
+            const tx = db.transaction("v", "readwrite");
+            const store = tx.objectStore("v");
             store.openCursor().onsuccess = (e) => {
-                const cursor = e.target.result;
-                if(cursor) {
-                    enviarHaciaPC(cursor.value.item, cursor.value.cant);
-                    const delTx = db.transaction("ventas", "readwrite");
-                    delTx.objectStore("ventas").delete(cursor.primaryKey);
-                    cursor.continue();
-                } else { 
-                    setTimeout(() => { pop("✅ Sincronizado"); location.reload(); }, 1000);
-                }
+                const cur = e.target.result;
+                if(cur) {
+                    env(cur.value.m, cur.value.c);
+                    store.delete(cur.primaryKey);
+                    cur.continue();
+                } else { setTimeout(() => location.reload(), 1000); }
             };
         }
 
-        function revisarPendientes() {
-            db.transaction("ventas").objectStore("ventas").count().onsuccess = (e) => {
+        function act() {
+            db.transaction("v").objectStore("v").count().onsuccess = (e) => {
                 document.getElementById('sync-box').style.display = e.target.result > 0 ? 'block' : 'none';
             };
         }
 
-        function pop(m) {
+        function msg(m) {
             const t = document.getElementById('pop'); t.innerText = m; t.style.display = 'block';
             setTimeout(() => t.style.display = 'none', 3000);
         }
     </script>
 </body>
 </html>
+
 
 
 
