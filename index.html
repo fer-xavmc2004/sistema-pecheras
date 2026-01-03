@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Pecheras G1 - Ventas</title>
+    <title>Pecheras G1 - Sistema Fijo</title>
     <style>
         :root { --p: #1a73e8; --bg: #f8f9fa; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px; }
         .card { background: var(--card); border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
-        h2 { color: var(--p); font-weight: 900; margin-bottom: 25px; }
+        h2 { color: var(--p); font-weight: 800; margin-bottom: 25px; }
         input { width: 100%; padding: 18px; border-radius: 15px; border: 2px solid var(--p); font-size: 28px; text-align: center; margin-bottom: 25px; background: var(--card); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; transition: 0.1s; }
+        .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; }
         .btn:active { opacity: 0.5; transform: scale(0.95); }
         #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; }
-        #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
+        #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="pop"></div>
-    <button id="sync" onclick="sincronizar()">🔄 ENVIAR DATOS A PC</button>
+    <div id="msg"></div>
+    <button id="sync" onclick="sincronizar()">🔄 SINCRONIZAR AHORA</button>
     <div class="card">
         <h2>🛍️ Nueva Venta</h2>
         <input type="number" id="cant" value="1" inputmode="numeric">
@@ -34,10 +34,10 @@
 
     <script>
         let db;
-        // TU URL DE NGROK
+        // TU URL FIJA DEFINITIVA
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        const request = indexedDB.open("DB_PECHERAS_V100", 1);
+        const request = indexedDB.open("DB_PECHERAS_FINAL_PRO", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; act(); };
 
@@ -45,25 +45,27 @@
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
-            tx.oncomplete = () => { 
-                pop("✅ Guardado"); 
-                act(); 
-                enviar(m, c); 
-            };
+            tx.oncomplete = () => { act(); pop("✅ Guardado"); enviar(m, c); };
         }
 
-        function enviar(item, cant) {
-            // Método infalible de "petición ciega" para Safari
-            const img = new Image();
+        async function enviar(item, cant) {
             const query = `?item=${encodeURIComponent(item)}&cant=${encodeURIComponent(cant)}&z=${Date.now()}`;
-            img.src = URL_PC + query;
+            try {
+                // Esta cabecera salta el aviso de ngrok automáticamente
+                await fetch(URL_PC + query, {
+                    method: 'GET',
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
+                console.log("Enviado con éxito");
+            } catch (e) {
+                console.log("Error de red, se queda en sincronización pendiente.");
+            }
         }
 
         async function sincronizar() {
             pop("🚀 Sincronizando...");
             const tx = db.transaction("v", "readwrite");
             const store = tx.objectStore("v");
-            
             store.openCursor().onsuccess = (e) => {
                 const cur = e.target.result;
                 if(cur) {
@@ -71,7 +73,7 @@
                     store.delete(cur.primaryKey);
                     cur.continue();
                 } else { 
-                    setTimeout(() => { pop("✅ Sincronizado"); location.reload(); }, 1500); 
+                    setTimeout(() => { pop("✅ Finalizado"); location.reload(); }, 1500); 
                 }
             };
         }
@@ -83,12 +85,13 @@
         }
 
         function pop(t) {
-            const m = document.getElementById('pop'); m.innerText = t; m.style.display = 'block';
+            const m = document.getElementById('msg'); m.innerText = t; m.style.display = 'block';
             setTimeout(() => m.style.display = 'none', 3000);
         }
     </script>
 </body>
 </html>
+
 
 
 
