@@ -34,70 +34,68 @@
 
     <script>
         let db;
-        let estaEnviando = false;
+        let bloqueado = false;
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        // Versión V400 para asegurar limpieza total de basura anterior
-        const request = indexedDB.open("DB_PECHERAS_V400", 1);
+        // Abrimos DB V500 para empezar de cero sin registros viejos
+        const request = indexedDB.open("DB_PECHERAS_V500", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
-        request.onsuccess = (e) => { db = e.target.result; actualizarBoton(); };
+        request.onsuccess = (e) => { db = e.target.result; act(); };
 
         function vender(m) {
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
-            tx.oncomplete = () => { 
-                estaEnviando = false;
-                actualizarBoton(); 
-                mostrarPop("📦 Anotado"); 
-            };
+            tx.oncomplete = () => { act(); pop("📦 Anotado"); };
         }
 
         async function sincronizar() {
-            if (estaEnviando) return;
-            estaEnviando = true;
+            if (bloqueado) return;
+            bloqueado = true;
             
-            document.getElementById('sync').style.display = 'none';
-            mostrarPop("🚀 Sincronizando...");
+            const btn = document.getElementById('sync');
+            btn.style.display = 'none'; // Desaparece inmediatamente
+            pop("🚀 Sincronizando...");
 
             const tx = db.transaction("v", "readonly");
             const store = tx.objectStore("v");
-            const ventasParaEnviar = [];
+            const ventas = [];
 
             store.openCursor().onsuccess = async (e) => {
-                const cursor = e.target.result;
-                if (cursor) {
-                    ventasParaEnviar.push({ id: cursor.primaryKey, m: cursor.value.m, c: cursor.value.c });
-                    cursor.continue();
+                const cur = e.target.result;
+                if(cur) {
+                    ventas.push({m: cur.value.m, c: cur.value.c});
+                    cur.continue();
                 } else {
-                    // Una vez capturados todos, enviamos y borramos uno por uno
-                    for (const v of ventasParaEnviar) {
+                    // Enviamos todo a la PC
+                    for (const v of ventas) {
                         try {
                             const url = `${URL_PC}?item=${encodeURIComponent(v.m)}&cant=${encodeURIComponent(v.c)}&z=${Date.now()}`;
-                            const res = await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' } });
-                            
-                            if (res.ok) {
-                                // BORRADO REAL: Solo si la PC respondió OK, lo sacamos de la memoria
-                                const delTx = db.transaction("v", "readwrite");
-                                await delTx.objectStore("v").delete(v.id);
-                            }
-                        } catch (err) { console.error("Error en " + v.m); }
+                            await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+                        } catch (err) { console.log("Error de red"); }
                     }
                     
-                    mostrarPop("✅ CONSOLA LIMPIA");
-                    estaEnviando = false;
-                    actualizarBoton(); // Esto esconderá el botón porque ya no habrá registros
+                    // LIMPIEZA TOTAL: Borramos la tabla entera del iPhone
+                    const cleanTx = db.transaction("v", "readwrite");
+                    cleanTx.objectStore("v").clear(); // Borrado garantizado de todo
+                    
+                    cleanTx.oncomplete = () => {
+                        pop("✅ ENVIADO Y LIMPIO");
+                        bloqueado = false;
+                        act(); // Esto ocultará el botón porque la cuenta será 0
+                    };
                 }
             };
         }
 
-        function actualizarBoton() {
+        function act() {
             if (!db) return;
             const tx = db.transaction("v", "readonly");
             tx.objectStore("v").count().onsuccess = (e) => {
                 const count = e.target.result;
                 const btn = document.getElementById('sync');
-                if (count > 0 && !estaEnviando) {
+                // El botón solo vuelve a nacer si hay registros nuevos y no estamos enviando
+                if (count > 0 && !bloqueado) {
                     btn.style.display = 'block';
                     btn.innerText = `🔄 ENVIAR ${count} VENTAS A PC`;
                 } else {
@@ -106,13 +104,14 @@
             };
         }
 
-        function mostrarPop(t) {
+        function pop(t) {
             const m = document.getElementById('msg'); m.innerText = t; m.style.display = 'block';
             setTimeout(() => m.style.display = 'none', 2000);
         }
     </script>
 </body>
 </html>
+
 
 
 
