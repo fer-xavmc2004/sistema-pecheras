@@ -9,18 +9,18 @@
     <style>
         :root { --p: #1a73e8; --bg: #ffffff; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; }
-        .pantalla { display: none; padding: 20px; padding-bottom: 100px; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding-bottom: 100px; }
+        .pantalla { display: none; padding: 20px; }
         .activa { display: block !important; }
         .card { background: var(--card); border-radius: 20px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h2 { color: var(--p); text-align: center; font-weight: 800; }
+        h2 { color: var(--p); text-align: center; }
         input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 22px; text-align: center; margin-bottom: 15px; background: var(--bg); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .btn-v { background: var(--p); color: white; border: none; padding: 20px; border-radius: 18px; font-weight: bold; font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .btn-v { background: var(--p); color: white; border: none; padding: 20px; border-radius: 18px; font-weight: bold; font-size: 14px; }
         .nav { position: fixed; bottom: 0; width: 100%; height: 80px; background: var(--card); display: flex; border-top: 1px solid rgba(128,128,128,0.2); }
         .nav button { flex: 1; border: none; background: none; color: var(--t); font-weight: bold; opacity: 0.4; }
         .nav button.active { opacity: 1; color: var(--p); }
-        #sync-box { display: none; background: #ff9800; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; margin-bottom: 15px; cursor: pointer; }
+        #sync-box { display: none; background: #ff9800; color: white; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; margin: 15px; cursor: pointer; }
         #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 25px; border-radius: 30px; display: none; z-index: 9999; }
     </style>
 </head>
@@ -31,22 +31,21 @@
         <div class="card">
             <input type="number" id="cant" value="1" inputmode="numeric">
             <div class="grid">
-                <button class="btn-v" onclick="vender('Chihuahua')">🐕 CHIHUAHUA</button>
-                <button class="btn-v" onclick="vender('Mediana')">🐩 MEDIANA</button>
-                <button class="btn-v" onclick="vender('Grande')">🐕‍🦺 GRANDE</button>
-                <button class="btn-v" onclick="vender('Reforzada')">🛡️ REFORZADA</button>
+                <button class="btn-v" onclick="vender('Chihuahua')">🐕 Chihuahua</button>
+                <button class="btn-v" onclick="vender('Mediana')">🐩 Mediana</button>
+                <button class="btn-v" onclick="vender('Grande')">🐕‍🦺 Grande</button>
+                <button class="btn-v" onclick="vender('Reforzada')">🛡️ Reforzada</button>
             </div>
         </div>
-        <div id="sync-box" onclick="sincronizar()">🔄 SINCRONIZAR CON PC</div>
+        <div id="sync-box" onclick="sincronizar()">🔄 SINCRONIZAR DATOS</div>
     </div>
     <div id="p-historial" class="pantalla">
         <h2>📋 Resumen Local</h2>
         <div id="lista-pendientes"></div>
-        <div id="resumen-suma" style="text-align:center; font-weight:bold; padding:20px;"></div>
     </div>
     <div class="nav">
-        <button id="n-v" class="active" onclick="ver('v')">🏠 INICIO</button>
-        <button id="n-h" onclick="ver('h')">📊 HISTORIAL</button>
+        <button id="n-v" class="active" onclick="ver('v')">🏠 Inicio</button>
+        <button id="n-h" onclick="ver('h')">📊 Historial</button>
     </div>
 
     <script>
@@ -59,59 +58,33 @@
 
         function vender(m) {
             const c = document.getElementById('cant').value;
-            const log = { item: m, cant: c, id: Date.now() };
+            const log = { item: m, cant: c };
             const tx = db.transaction("logs", "readwrite");
             tx.objectStore("logs").add(log);
             tx.oncomplete = () => { 
-                pop("✅ Guardado en celular"); 
+                pop("✅ Guardado"); 
                 revisarPendientes(); 
-                enviarDato(log); 
+                fetch(LAPTOP_IP + "?item=" + m + "&cant=" + c, { mode: 'no-cors' }); 
             };
         }
 
-        function enviarDato(d) {
-            const p = new URLSearchParams({ item: d.item, cant: d.cant });
-            // 'no-cors' hace que el iPhone envíe el dato aunque la laptop sea http
-            fetch(LAPTOP_IP + "?" + p.toString(), { mode: 'no-cors' })
-            .then(() => { 
-                pop("🚀 Enviado a Laptop"); 
-                borrarID(d.id); 
-            })
-            .catch(() => pop("📡 Laptop desconectada"));
-        }
-
         async function sincronizar() {
-            pop("🔄 Sincronizando todo...");
+            pop("🔄 Enviando...");
             const tx = db.transaction("logs", "readwrite");
             const store = tx.objectStore("logs");
             store.openCursor().onsuccess = async (e) => {
                 const cursor = e.target.result;
                 if(cursor) {
                     const d = cursor.value;
-                    try {
-                        const p = new URLSearchParams({ item: d.item, cant: d.cant });
-                        await fetch(LAPTOP_IP + "?" + p.toString(), { mode: 'no-cors' });
-                        const delTx = db.transaction("logs", "readwrite");
-                        delTx.objectStore("logs").delete(cursor.primaryKey);
-                        cursor.continue();
-                    } catch(err) { pop("❌ Error de conexión"); }
+                    // Enviamos sin esperar respuesta para saltar el bloqueo del iPhone
+                    fetch(LAPTOP_IP + "?item=" + d.item + "&cant=" + d.cant, { mode: 'no-cors' });
+                    const delTx = db.transaction("logs", "readwrite");
+                    delTx.objectStore("logs").delete(cursor.primaryKey);
+                    cursor.continue();
                 } else { 
-                    pop("✅ Todo sincronizado"); 
+                    pop("✅ Sincronizado"); 
                     setTimeout(() => location.reload(), 1000); 
                 }
-            };
-        }
-
-        function borrarID(id) {
-            const tx = db.transaction("logs", "readwrite");
-            const store = tx.objectStore("logs");
-            store.openCursor().onsuccess = (e) => {
-                const c = e.target.result;
-                if(c) {
-                    if(c.value.id === id) c.delete();
-                    else c.continue();
-                }
-                revisarPendientes();
             };
         }
 
@@ -125,14 +98,13 @@
 
         function mostrarPendientes() {
             const lista = document.getElementById('lista-pendientes');
-            lista.innerHTML = ""; let total = 0;
+            lista.innerHTML = "";
             db.transaction("logs").objectStore("logs").openCursor().onsuccess = (e) => {
-                const cursor = e.target.result;
-                if(cursor) {
-                    total += parseInt(cursor.value.cant);
-                    lista.innerHTML += `<div class="card"><b>${cursor.value.item}</b>: ${cursor.value.cant} doc.</div>`;
-                    cursor.continue();
-                } else { document.getElementById('resumen-suma').innerText = "Total: " + total; }
+                const c = e.target.result;
+                if(c) {
+                    lista.innerHTML += `<div class="card"><b>${c.value.item}</b>: ${c.value.cant}</div>`;
+                    c.continue();
+                }
             };
         }
 
@@ -144,11 +116,12 @@
 
         function pop(m) {
             const t = document.getElementById('pop'); t.innerText = m; t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
+            setTimeout(() => t.style.display = 'none', 2000);
         }
     </script>
 </body>
 </html>
+
 
 
 
