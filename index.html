@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Pecheras G1 - Final</title>
+    <title>Pecheras G1 - Control Total</title>
     <style>
         :root { --p: #1a73e8; --bg: #f8f9fa; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
@@ -13,15 +13,14 @@
         input { width: 100%; padding: 18px; border-radius: 15px; border: 2px solid var(--p); font-size: 28px; text-align: center; margin-bottom: 25px; background: var(--card); color: var(--t); box-sizing: border-box; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; }
-        .btn:active { background: #1557b0; }
-        #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; animation: pulse 2s infinite; }
+        .btn:active { background: #1557b0; opacity: 0.8; }
+        #sync { display: none; background: #ff9800; color: white; padding: 20px; border-radius: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; width: 100%; border: none; font-size: 18px; }
         #pop { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="pop"></div>
-    <button id="sync" onclick="sincronizar()">🔄 SINCRONIZAR TODO A PC</button>
+    <button id="sync" onclick="sincronizar()">🔄 ENVIAR DATOS A PC</button>
     <div class="card">
         <h2>🛍️ Nueva Venta</h2>
         <input type="number" id="cant" value="1" inputmode="numeric">
@@ -37,7 +36,7 @@
         let db;
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        const request = indexedDB.open("DB_PECHERAS_G1_V_FINAL", 1);
+        const request = indexedDB.open("DB_PECHERAS_FINAL_V2", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; act(); };
 
@@ -45,29 +44,34 @@
             const c = document.getElementById('cant').value;
             const tx = db.transaction("v", "readwrite");
             tx.objectStore("v").add({ m, c });
-            tx.oncomplete = () => { act(); msg("📦 " + m + " guardado"); };
+            tx.oncomplete = () => { act(); msg("📦 " + m + " anotado"); };
         }
 
-        function sincronizar() {
-            msg("🚀 Sincronizando...");
+        async function sincronizar() {
+            msg("🚀 Enviando...");
             const tx = db.transaction("v", "readwrite");
             const store = tx.objectStore("v");
             
-            store.openCursor().onsuccess = (e) => {
+            store.openCursor().onsuccess = async (e) => {
                 const cur = e.target.result;
                 if(cur) {
-                    // Usamos método de Imagen para evitar bloqueos de Safari y enviar todo
-                    const img = new Image();
-                    img.src = `${URL_PC}?item=${encodeURIComponent(cur.value.m)}&cant=${encodeURIComponent(cur.value.c)}&z=${Date.now()}`;
+                    const i = cur.value.m;
+                    const c = cur.value.c;
                     
-                    // Borramos inmediatamente de la lista local
-                    store.delete(cur.primaryKey);
+                    // 1. Crear la imagen de envío
+                    const img = new Image();
+                    img.src = `${URL_PC}?item=${encodeURIComponent(i)}&cant=${encodeURIComponent(c)}&z=${Date.now()}`;
+                    
+                    // 2. Esperar un poco para que el iPhone logre mandar el paquete
+                    await new Promise(r => setTimeout(r, 600)); 
+                    
+                    // 3. Borrar y seguir con el siguiente
+                    const delTx = db.transaction("v", "readwrite");
+                    delTx.objectStore("v").delete(cur.primaryKey);
                     cur.continue();
                 } else { 
-                    setTimeout(() => { 
-                        msg("✅ ¡TODO ENVIADO!"); 
-                        location.reload(); 
-                    }, 1000); 
+                    msg("✅ ¡TODO EN CONSOLA!");
+                    setTimeout(() => { location.reload(); }, 1000); 
                 }
             };
         }
@@ -88,6 +92,7 @@
     </script>
 </body>
 </html>
+
 
 
 
