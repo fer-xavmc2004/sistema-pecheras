@@ -3,19 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Pecheras G1 - Control</title>
+    <title>Pecheras G1 - Android Chrome</title>
     <style>
         :root { --p: #1a73e8; --bg: #f8f9fa; --t: #202124; --card: #ffffff; }
         @media (prefers-color-scheme: dark) { :root { --bg: #121212; --t: #e8eaed; --card: #1e1e1e; } }
-        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 20px; }
-        .card { background: var(--card); border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; max-width: 400px; margin: auto; }
-        h2 { color: var(--p); font-weight: 800; margin-bottom: 25px; }
-        input { width: 100%; padding: 18px; border-radius: 15px; border: 2px solid var(--p); font-size: 28px; text-align: center; margin-bottom: 25px; background: var(--card); color: var(--t); box-sizing: border-box; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
-        .btn { background: var(--p); color: white; border: none; padding: 25px; border-radius: 18px; font-weight: bold; font-size: 16px; cursor: pointer; }
-        .btn:active { transform: scale(0.95); opacity: 0.8; }
-        #sync { display: none; background: #ff9800; color: white; padding: 22px; border-radius: 18px; text-align: center; font-weight: 800; width: 100%; border: none; font-size: 18px; box-shadow: 0 6px 15px rgba(255,152,0,0.4); margin-top: 10px; cursor: pointer; }
-        #msg { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 9999; font-weight: bold; }
+        body { font-family: Roboto, sans-serif; background: var(--bg); color: var(--t); margin: 0; padding: 15px; }
+        .card { background: var(--card); border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; max-width: 450px; margin: auto; }
+        h2 { color: var(--p); font-weight: 800; margin-bottom: 20px; }
+        input { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid var(--p); font-size: 24px; text-align: center; margin-bottom: 20px; background: var(--card); color: var(--t); box-sizing: border-box; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .btn { background: var(--p); color: white; border: none; padding: 20px; border-radius: 15px; font-weight: bold; font-size: 15px; cursor: pointer; }
+        .btn:active { background: #1557b0; transform: scale(0.98); }
+        
+        #sync { 
+            display: none; 
+            background: #ff9800; 
+            color: white; 
+            padding: 20px; 
+            border-radius: 15px; 
+            text-align: center; 
+            font-weight: 800; 
+            width: 100%; 
+            border: none; 
+            font-size: 17px; 
+            box-shadow: 0 4px 12px rgba(255,152,0,0.3);
+            margin-top: 10px;
+        }
+        
+        #msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 25px; border-radius: 25px; display: none; z-index: 9999; font-weight: bold; }
+        
+        /* Estilos para el historial en Android */
+        .historial-box { margin-top: 25px; text-align: left; font-size: 13px; }
+        .item-hist { padding: 8px; border-bottom: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -30,6 +49,12 @@
             <button class="btn" onclick="vender('Reforzada')">Reforzada</button>
         </div>
         <button id="sync" onclick="sincronizar()">🔄 ENVIAR VENTAS A PC</button>
+
+        <div class="historial-box">
+            <h3 style="color: var(--p)">📋 Historial Reciente:</h3>
+            <div id="lista_historial">
+                </div>
+        </div>
     </div>
 
     <script>
@@ -37,7 +62,7 @@
         let bloqueado = false;
         const URL_PC = "https://vespine-breakfastless-cordie.ngrok-free.dev/vender"; 
 
-        const request = indexedDB.open("DB_PECHERAS_V700", 1);
+        const request = indexedDB.open("DB_PECHERAS_CHROME_V1", 1);
         request.onupgradeneeded = (e) => { e.target.result.createObjectStore("v", { autoIncrement: true }); };
         request.onsuccess = (e) => { db = e.target.result; act(); };
 
@@ -52,7 +77,7 @@
             if (bloqueado) return;
             bloqueado = true;
             document.getElementById('sync').style.display = 'none';
-            pop("🚀 Enviando a PC...");
+            pop("🚀 Enviando datos...");
 
             const tx = db.transaction("v", "readonly");
             const store = tx.objectStore("v");
@@ -67,21 +92,17 @@
                     for (const v of ventas) {
                         try {
                             const url = `${URL_PC}?item=${encodeURIComponent(v.m)}&cant=${encodeURIComponent(v.c)}&z=${Date.now()}`;
-                            // Cambiamos a fetch con cabeceras explícitas para Edge
-                            await fetch(url, { 
-                                method: 'GET',
-                                mode: 'cors', 
-                                headers: { 'ngrok-skip-browser-warning': 'true' } 
-                            });
-                        } catch (err) { console.error("Error de conexión en Edge"); }
+                            await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+                        } catch (err) { console.log("Error de red"); }
                     }
                     
+                    // LIMPIEZA TOTAL POST-ENVÍO
                     const cleanTx = db.transaction("v", "readwrite");
                     cleanTx.objectStore("v").clear();
                     cleanTx.oncomplete = () => {
-                        pop("✅ ENVIADO Y LIMPIO");
+                        pop("✅ CONSOLA ACTUALIZADA");
                         bloqueado = false;
-                        act();
+                        location.reload(); // Recarga para ver el historial nuevo
                     };
                 }
             };
@@ -106,6 +127,7 @@
     </script>
 </body>
 </html>
+
 
 
 
